@@ -43,7 +43,8 @@
     #tab-home:checked~.app #home,
     #tab-food:checked~.app #food,
     #tab-gym:checked~.app #gym,
-    #tab-progress:checked~.app #progress{display:block}
+    #tab-progress:checked~.app #progress,
+    #tab-ai:checked~.app #ai{display:block}
     .hero{
       padding:22px;border:1px solid var(--line);border-radius:24px;
       background:linear-gradient(145deg,#161d24,#101419);box-shadow:0 20px 55px rgba(0,0,0,.22)
@@ -71,7 +72,11 @@
     .todo input[type=checkbox]{width:19px;height:19px;min-width:19px;margin:1px 0 0;padding:0;accent-color:var(--green)}
     .form{display:grid;grid-template-columns:1fr 1fr;gap:10px}
     label.field span{display:block;margin-bottom:5px;font-size:.76rem;color:var(--muted)}
-    input:not([type=checkbox]),select{width:100%;min-height:44px;border:1px solid var(--line);border-radius:11px;padding:9px 11px;background:#0d1318;color:var(--text)}
+    input:not([type=checkbox]),select,textarea{width:100%;min-height:44px;border:1px solid var(--line);border-radius:11px;padding:9px 11px;background:#0d1318;color:var(--text)}
+    textarea{min-height:240px;resize:vertical;line-height:1.55}
+    .action-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+    .report-box{white-space:pre-wrap;word-break:break-word;max-height:440px;overflow:auto;padding:13px;border:1px solid var(--line);border-radius:13px;background:#0d1318;font-size:.82rem;line-height:1.55}
+    .privacy-note{padding:10px 12px;border:1px solid rgba(110,200,255,.28);border-radius:12px;background:rgba(110,200,255,.06);color:#cfeeff;font-size:.8rem}
     .form .wide{grid-column:1/-1}
     .btn{width:100%;min-height:44px;border:0;border-radius:12px;padding:10px 14px;background:var(--green);color:#0b1407;font-weight:900}
     .btn.secondary{background:var(--surface2);color:var(--text);border:1px solid var(--line)}
@@ -89,7 +94,7 @@
       padding:8px 10px calc(8px + var(--safe-bottom));background:rgba(11,15,19,.96);
       -webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);border-top:1px solid var(--line)
     }
-    .bottom-inner{width:min(760px,100%);margin:auto;display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+    .bottom-inner{width:min(760px,100%);margin:auto;display:grid;grid-template-columns:repeat(5,1fr);gap:5px}
     .nav-label{
       min-height:55px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
       border-radius:13px;color:var(--muted);user-select:none;-webkit-user-select:none;cursor:pointer;font-size:.74rem;font-weight:700
@@ -98,7 +103,8 @@
     #tab-home:checked~.bottom-nav label[for=tab-home],
     #tab-food:checked~.bottom-nav label[for=tab-food],
     #tab-gym:checked~.bottom-nav label[for=tab-gym],
-    #tab-progress:checked~.bottom-nav label[for=tab-progress]{background:var(--surface2);color:var(--green)}
+    #tab-progress:checked~.bottom-nav label[for=tab-progress],
+    #tab-ai:checked~.bottom-nav label[for=tab-ai]{background:var(--surface2);color:var(--green)}
     .status{display:flex;justify-content:space-between;gap:12px;align-items:center}
     @media(max-width:520px){
       .grid{grid-template-columns:1fr}.card{grid-column:1}.full{grid-column:1}
@@ -111,6 +117,7 @@
   <input class="tab-radio" type="radio" name="tabs" id="tab-food">
   <input class="tab-radio" type="radio" name="tabs" id="tab-gym">
   <input class="tab-radio" type="radio" name="tabs" id="tab-progress">
+  <input class="tab-radio" type="radio" name="tabs" id="tab-ai">
 
   <main class="app">
     <header><div class="brand"><b>DIET OS</b><span>67kg → 55kg / 3月末</span></div></header>
@@ -224,6 +231,56 @@
         </div>
       </div>
     </section>
+
+    <section class="page" id="ai">
+      <div class="hero">
+        <div class="eyebrow">AI REVIEW</div>
+        <h1>ChatGPTに相談</h1>
+        <p class="muted">端末内の記録から、相談用レポートを自動生成します。</p>
+      </div>
+      <div class="grid">
+        <div class="card full">
+          <h2>レポート設定</h2>
+          <div class="form">
+            <label class="field">
+              <span>期間</span>
+              <select id="ai-days">
+                <option value="7">直近7日</option>
+                <option value="14" selected>直近14日</option>
+                <option value="30">直近30日</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>内容</span>
+              <select id="ai-scope">
+                <option value="all">全部</option>
+                <option value="food">食事だけ</option>
+                <option value="gym">筋トレだけ</option>
+              </select>
+            </label>
+            <button class="btn wide" type="button" id="generate-report">レポートを生成</button>
+          </div>
+        </div>
+
+        <div class="card full">
+          <h2>ChatGPT相談用レポート</h2>
+          <div id="ai-report" class="report-box">「レポートを生成」を押してください。</div>
+          <div class="action-grid" style="margin-top:10px">
+            <button class="btn" type="button" id="share-report">共有シートを開く</button>
+            <button class="btn secondary" type="button" id="copy-report">コピー</button>
+            <button class="btn secondary" type="button" id="download-report">JSON出力</button>
+            <button class="btn secondary" type="button" id="refresh-report">再生成</button>
+          </div>
+        </div>
+
+        <div class="card full">
+          <div class="privacy-note">
+            この操作をするまで記録は外部へ送信されません。共有シートではChatGPTを選ぶか、
+            「コピー」でこのチャットへ貼り付けてください。JSONをこのチャットへ添付しても解析できます。
+          </div>
+        </div>
+      </div>
+    </section>
   </main>
 
   <nav class="bottom-nav" aria-label="メインナビゲーション">
@@ -232,6 +289,7 @@
       <label class="nav-label" for="tab-food"><strong>◫</strong>食事</label>
       <label class="nav-label" for="tab-gym"><strong>▲</strong>ジム</label>
       <label class="nav-label" for="tab-progress"><strong>↗</strong>進捗</label>
+      <label class="nav-label" for="tab-ai"><strong>✦</strong>AI相談</label>
     </div>
   </nav>
 
@@ -377,8 +435,197 @@
       }catch{alert("JSONを読み込めませんでした");}
     });
 
+    const isoDate = d => {
+      const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,"0"),day=String(d.getDate()).padStart(2,"0");
+      return y+"-"+m+"-"+day;
+    };
+    const round1 = n => Math.round(n*10)/10;
+    const avgPresent = (arr,key) => {
+      const vals=arr.map(x=>Number(x[key]||0)).filter(v=>v>0);
+      return vals.length ? round1(vals.reduce((a,b)=>a+b,0)/vals.length) : null;
+    };
+    const firstPresent = (arr,key) => arr.find(x=>Number(x[key]||0)>0);
+    const lastPresent = (arr,key) => [...arr].reverse().find(x=>Number(x[key]||0)>0);
+
+    function reportData(days,scope){
+      const end=new Date();
+      const start=new Date();
+      start.setDate(end.getDate()-(days-1));
+      const from=isoDate(start), to=isoDate(end);
+      const inRange=x=>x.date>=from&&x.date<=to;
+
+      const progress=S.get("progressLogs",[]).filter(inRange).sort((a,b)=>a.date.localeCompare(b.date));
+      const food=S.get("foodLogs",[]).filter(inRange).sort((a,b)=>a.date.localeCompare(b.date));
+      const workouts=S.get("workoutLogs",[]).filter(inRange).sort((a,b)=>a.date.localeCompare(b.date));
+
+      const foodDays={};
+      food.forEach(x=>{
+        foodDays[x.date]??={kcal:0,protein:0,items:[]};
+        foodDays[x.date].kcal+=Number(x.kcal||0);
+        foodDays[x.date].protein+=Number(x.protein||0);
+        foodDays[x.date].items.push({meal:x.meal,name:x.name,kcal:Number(x.kcal||0),protein:Number(x.protein||0),memo:x.memo||""});
+      });
+      const foodDaily=Object.entries(foodDays).map(([date,v])=>({date,kcal:round1(v.kcal),protein:round1(v.protein),items:v.items}));
+      const avgFoodKcal=foodDaily.length?round1(foodDaily.reduce((s,x)=>s+x.kcal,0)/foodDaily.length):null;
+      const avgFoodProtein=foodDaily.length?round1(foodDaily.reduce((s,x)=>s+x.protein,0)/foodDaily.length):null;
+
+      const firstWeight=firstPresent(progress,"weight"),lastWeight=lastPresent(progress,"weight");
+      const weightDelta=firstWeight&&lastWeight?round1(Number(lastWeight.weight)-Number(firstWeight.weight)):null;
+
+      const measureDelta = key => {
+        const a=firstPresent(progress,key), b=lastPresent(progress,key);
+        return a&&b ? {from:Number(a[key]),to:Number(b[key]),delta:round1(Number(b[key])-Number(a[key]))} : null;
+      };
+
+      const ex={};
+      workouts.forEach(w=>w.items?.forEach(item=>{
+        ex[item.name]??=[];
+        ex[item.name].push({date:w.date,weight:Number(item.weight||0),r1:Number(item.r1||0),r2:Number(item.r2||0)});
+      }));
+      const exerciseProgress=Object.entries(ex).map(([name,logs])=>({
+        name,
+        first:logs[0],
+        latest:logs[logs.length-1],
+        weightDelta:round1((logs[logs.length-1]?.weight||0)-(logs[0]?.weight||0))
+      }));
+
+      return {
+        generatedAt:new Date().toISOString(),
+        period:{days,from,to},
+        scope,
+        summary:{
+          currentWeight:lastWeight?Number(lastWeight.weight):null,
+          weightDelta,
+          avgWeight:avgPresent(progress,"weight"),
+          avgSteps:avgPresent(progress,"steps"),
+          avgSleep:avgPresent(progress,"sleep"),
+          waist:measureDelta("waist"),
+          thigh:measureDelta("thigh"),
+          calf:measureDelta("calf"),
+          foodLoggedDays:foodDaily.length,
+          avgCaloriesPerLoggedDay:avgFoodKcal,
+          avgProteinPerLoggedDay:avgFoodProtein,
+          externalMeals:food.filter(x=>x.meal==="外食").length,
+          workouts:workouts.length
+        },
+        progress: scope==="food"||scope==="gym" ? [] : progress,
+        food: scope==="gym" ? [] : foodDaily,
+        workouts: scope==="food" ? [] : workouts,
+        exerciseProgress: scope==="food" ? [] : exerciseProgress
+      };
+    }
+
+    function fmtChange(v,unit){
+      if(v==null)return "記録不足";
+      return (v>0?"+":"")+v+unit;
+    }
+
+    function buildReport(days,scope){
+      const d=reportData(days,scope),s=d.summary,lines=[];
+      lines.push("Diet OSの記録をレビューしてください。");
+      lines.push("目標：168cm / 67kg開始 → 55kg、週3回ジム、摂取目安1,500〜1,700kcal、Protein 110g。");
+      lines.push("対象期間："+d.period.from+"〜"+d.period.to+"（"+days+"日）");
+      lines.push("");
+      lines.push("【サマリー】");
+      if(scope!=="food"&&scope!=="gym"){
+        lines.push("現在体重："+(s.currentWeight??"未記録")+"kg");
+        lines.push("期間内体重変化："+fmtChange(s.weightDelta,"kg"));
+        lines.push("平均体重："+(s.avgWeight??"未記録")+"kg");
+        lines.push("平均歩数："+(s.avgSteps??"未記録")+"歩");
+        lines.push("平均睡眠："+(s.avgSleep??"未記録")+"時間");
+        lines.push("ウエスト変化："+(s.waist?fmtChange(s.waist.delta,"cm"):"記録不足"));
+        lines.push("太もも変化："+(s.thigh?fmtChange(s.thigh.delta,"cm"):"記録不足"));
+        lines.push("ふくらはぎ変化："+(s.calf?fmtChange(s.calf.delta,"cm"):"記録不足"));
+      }
+      if(scope!=="gym"){
+        lines.push("食事記録日数："+s.foodLoggedDays+"日");
+        lines.push("記録日の平均摂取："+(s.avgCaloriesPerLoggedDay??"未記録")+"kcal");
+        lines.push("記録日の平均Protein："+(s.avgProteinPerLoggedDay??"未記録")+"g");
+        lines.push("外食記録："+s.externalMeals+"件");
+      }
+      if(scope!=="food"){
+        lines.push("筋トレ回数："+s.workouts+"回");
+      }
+
+      if(d.exerciseProgress.length){
+        lines.push("");
+        lines.push("【筋トレ重量推移】");
+        d.exerciseProgress.forEach(x=>lines.push(
+          x.name+"："+x.first.weight+"kg → "+x.latest.weight+"kg（"+fmtChange(x.weightDelta,"kg")+"）"
+        ));
+      }
+
+      if(d.progress.length){
+        lines.push("");
+        lines.push("【日別 身体・活動】");
+        d.progress.forEach(x=>lines.push(
+          x.date+" / 体重 "+(x.weight||"-")+"kg / 腹 "+(x.waist||"-")+"cm / 太もも "+(x.thigh||"-")+"cm / ふくらはぎ "+(x.calf||"-")+"cm / 睡眠 "+(x.sleep||"-")+"h / 歩数 "+(x.steps||"-")
+        ));
+      }
+
+      if(d.food.length){
+        lines.push("");
+        lines.push("【日別 食事】");
+        d.food.forEach(x=>{
+          lines.push(x.date+" / "+x.kcal+"kcal / P "+x.protein+"g");
+          x.items.forEach(i=>lines.push("  - "+i.meal+"："+i.name+"（"+i.kcal+"kcal / P"+i.protein+"g）"+(i.memo?" "+i.memo:"")));
+        });
+      }
+
+      if(d.workouts.length){
+        lines.push("");
+        lines.push("【筋トレ実績】");
+        d.workouts.forEach(w=>{
+          lines.push(w.date);
+          (w.items||[]).forEach(i=>lines.push("  - "+i.name+"："+i.weight+"kg / "+i.r1+"回, "+i.r2+"回"));
+        });
+      }
+
+      lines.push("");
+      lines.push("この記録を踏まえて、①進捗評価 ②食事 ③運動 ④睡眠・活動量 ⑤次の7日間で変えること、の順に具体的にレビューしてください。短期的な体重変動に反応しすぎず、7日平均を重視してください。");
+      return {text:lines.join("\n"),data:d};
+    }
+
+    let currentReport=null;
+    function renderAIReport(){
+      const days=Number($("ai-days").value),scope=$("ai-scope").value;
+      currentReport=buildReport(days,scope);
+      $("ai-report").textContent=currentReport.text;
+    }
+    $("generate-report").addEventListener("click",renderAIReport);
+    $("refresh-report").addEventListener("click",renderAIReport);
+    $("copy-report").addEventListener("click",async()=>{
+      if(!currentReport)renderAIReport();
+      try{
+        await navigator.clipboard.writeText(currentReport.text);
+        alert("相談用レポートをコピーしました。ChatGPTに貼り付けてください。");
+      }catch{
+        const ta=document.createElement("textarea");ta.value=currentReport.text;document.body.appendChild(ta);ta.select();
+        document.execCommand("copy");ta.remove();alert("コピーしました。");
+      }
+    });
+    $("share-report").addEventListener("click",async()=>{
+      if(!currentReport)renderAIReport();
+      if(navigator.share){
+        try{await navigator.share({title:"Diet OS レビュー用記録",text:currentReport.text});}catch(e){}
+      }else{
+        await navigator.clipboard.writeText(currentReport.text);
+        alert("共有機能が使えないため、クリップボードへコピーしました。");
+      }
+    });
+    $("download-report").addEventListener("click",()=>{
+      if(!currentReport)renderAIReport();
+      const blob=new Blob([JSON.stringify(currentReport.data,null,2)],{type:"application/json"});
+      const url=URL.createObjectURL(blob),a=document.createElement("a");
+      a.href=url;a.download="diet-os-chatgpt-report-"+S.date()+".json";document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);
+    });
+
     document.querySelectorAll(".nav-label").forEach(label=>label.addEventListener("click",()=>{
-      setTimeout(()=>{if(label.htmlFor==="tab-progress")renderProgress();window.scrollTo(0,0);},0);
+      setTimeout(()=>{
+        if(label.htmlFor==="tab-progress")renderProgress();
+        if(label.htmlFor==="tab-ai"&&!currentReport)renderAIReport();
+        window.scrollTo(0,0);
+      },0);
     }));
 
     window.addEventListener("resize",()=>draw(S.get("progressLogs",[]).slice(-30)));
