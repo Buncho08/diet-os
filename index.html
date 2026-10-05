@@ -77,6 +77,12 @@
     .action-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}
     .report-box{white-space:pre-wrap;word-break:break-word;max-height:440px;overflow:auto;padding:13px;border:1px solid var(--line);border-radius:13px;background:#0d1318;font-size:.82rem;line-height:1.55}
     .privacy-note{padding:10px 12px;border:1px solid rgba(110,200,255,.28);border-radius:12px;background:rgba(110,200,255,.06);color:#cfeeff;font-size:.8rem}
+    .cloud-row{display:flex;gap:8px;flex-wrap:wrap}
+    .cloud-row .btn{flex:1 1 160px}
+    .cloud-status{display:flex;align-items:center;gap:8px;margin:8px 0 12px}
+    .cloud-dot{width:9px;height:9px;border-radius:999px;background:#66727c;box-shadow:0 0 0 4px rgba(102,114,124,.12)}
+    .cloud-dot.on{background:var(--green);box-shadow:0 0 0 4px rgba(166,239,109,.12)}
+    .share-url{font-size:.78rem;word-break:break-all}
     .form .wide{grid-column:1/-1}
     .btn{width:100%;min-height:44px;border:0;border-radius:12px;padding:10px 14px;background:var(--green);color:#0b1407;font-weight:900}
     .btn.secondary{background:var(--surface2);color:var(--text);border:1px solid var(--line)}
@@ -230,6 +236,20 @@
         <div class="card"><h2>7日平均</h2><div class="metric" id="avg7">--</div></div>
         <div class="card full"><h2>体重推移</h2><canvas id="weight-chart"></canvas></div>
         <div class="card full">
+          <h2>Cloud Sync</h2>
+          <div class="cloud-status">
+            <span class="cloud-dot" id="cloud-dot"></span>
+            <span id="cloud-status">未接続</span>
+          </div>
+          <div class="cloud-row">
+            <button class="btn" type="button" id="cloud-connect">クラウド接続</button>
+            <button class="btn secondary" type="button" id="cloud-sync">今すぐ同期</button>
+            <button class="btn secondary" type="button" id="cloud-restore">クラウドから復元</button>
+          </div>
+          <p class="tiny">Supabaseへ食事・体重/サイズ・睡眠/歩数・筋トレ履歴を保存します。オフライン時は端末内の記録を使います。</p>
+        </div>
+
+        <div class="card full">
           <h2>バックアップ</h2>
           <div class="form">
             <button class="btn secondary" type="button" id="export-data">JSONを書き出す</button>
@@ -278,13 +298,22 @@
             <button class="btn secondary" type="button" id="copy-report">コピー</button>
             <button class="btn secondary" type="button" id="download-report">JSON出力</button>
             <button class="btn secondary" type="button" id="refresh-report">再生成</button>
+            <button class="btn wide" type="button" id="cloud-share-report">ChatGPT共有URLを発行（1時間）</button>
           </div>
         </div>
 
         <div class="card full">
           <div class="privacy-note">
-            この操作をするまで記録は外部へ送信されません。共有シートではChatGPTを選ぶか、
-            「コピー」でこのチャットへ貼り付けてください。JSONをこのチャットへ添付しても解析できます。
+            「ChatGPT共有URL」はSupabaseの非公開StorageにJSONを置き、1時間だけ有効な署名付きURLを発行します。
+            URLをこのチャットへ送れば、こちらから記録を読んでレビューできます。
+          </div>
+          <div id="share-url-wrap" style="display:none;margin-top:10px">
+            <div class="tiny">最新の共有URL（1時間有効）</div>
+            <div class="share-url" id="share-url"></div>
+            <div class="cloud-row" style="margin-top:8px">
+              <button class="btn secondary" type="button" id="copy-share-url">URLをコピー</button>
+              <button class="btn danger" type="button" id="revoke-share-url">共有を無効化</button>
+            </div>
           </div>
         </div>
       </div>
@@ -301,6 +330,7 @@
     </div>
   </nav>
 
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
   (() => {
     "use strict";
@@ -314,6 +344,15 @@
       }
     };
     const target={kcal:1600,protein:110,steps:7000,sleep:7};
+    const SUPABASE_URL="https://dygzsficwncawfkyuvoy.supabase.co";
+    const SUPABASE_PUBLISHABLE_KEY="sb_publishable_kjjXKV3-gLiFKuLvTA9nUA_vnVAogFN";
+    const sb=window.supabase?.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{
+      auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}
+    });
+    let cloudUser=null;
+    let cloudSyncTimer=null;
+    let lastSharePath=null;
+    let lastSignedUrl=null;
     const exercises=[
       ["Seated Leg Curl",10,"10〜12"],["Hip Abduction",20,"12〜15"],["Glute Drive / Hip Thrust",17.5,"10〜12"],
       ["Lat Pulldown",15,"10〜12"],["Seated Row",15,"10〜12"],["Chest Press",10,"10〜12"],["Abdominal Crunch",12.5,"12〜15"]
@@ -321,6 +360,107 @@
     const latest=a=>a.length?a[a.length-1]:null;
     const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
     const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"}[c]));
+
+    function uuid(){
+      return (window.crypto&&crypto.randomUUID)?crypto.randomUUID():Date.now()+"-"+Math.random().toString(16).slice(2);
+    }
+    function normalizeLocalIds(){
+      const food=S.get("foodLogs",[]).map(x=>({...x,id:x.id||uuid()}));
+      const workouts=S.get("workoutLogs",[]).map(x=>({...x,id:x.id||uuid()}));
+      S.set("foodLogs",food);S.set("workoutLogs",workouts);
+    }
+    function setCloudStatus(text,on=false){
+      $("cloud-status").textContent=text;
+      $("cloud-dot").classList.toggle("on",on);
+    }
+    async function getCloudSession(){
+      if(!sb) return null;
+      const {data}=await sb.auth.getSession();
+      cloudUser=data.session?.user||null;
+      if(cloudUser)setCloudStatus("接続済み",true);
+      else setCloudStatus("未接続",false);
+      return cloudUser;
+    }
+    async function connectCloud(){
+      if(!sb){alert("Supabase SDKを読み込めませんでした。");return null;}
+      let user=await getCloudSession();
+      if(user)return user;
+      setCloudStatus("接続中…",false);
+      const {data,error}=await sb.auth.signInAnonymously();
+      if(error){
+        setCloudStatus("接続できません",false);
+        alert("Supabaseの匿名サインインを有効にしてください。\n\n"+error.message);
+        return null;
+      }
+      cloudUser=data.user;
+      setCloudStatus("接続済み",true);
+      return cloudUser;
+    }
+    async function pushLocalToCloud(){
+      const user=await connectCloud(); if(!user)return false;
+      normalizeLocalIds();
+      setCloudStatus("同期中…",true);
+      const progress=S.get("progressLogs",[]).map(x=>({
+        user_id:user.id,date:x.date,weight:x.weight||null,waist:x.waist||null,thigh:x.thigh||null,calf:x.calf||null,
+        sleep:x.sleep||null,steps:x.steps||null
+      }));
+      const food=S.get("foodLogs",[]).map(x=>({
+        user_id:user.id,id:String(x.id),date:x.date,meal:x.meal,name:x.name,kcal:x.kcal||0,protein:x.protein||0,memo:x.memo||""
+      }));
+      const workouts=S.get("workoutLogs",[]).map(x=>({
+        user_id:user.id,id:String(x.id),date:x.date,items:x.items||[]
+      }));
+      try{
+        if(progress.length){
+          const {error}=await sb.from("daily_metrics").upsert(progress,{onConflict:"user_id,date"});
+          if(error)throw error;
+        }
+        if(food.length){
+          const {error}=await sb.from("food_entries").upsert(food,{onConflict:"user_id,id"});
+          if(error)throw error;
+        }
+        if(workouts.length){
+          const {error}=await sb.from("workout_logs").upsert(workouts,{onConflict:"user_id,id"});
+          if(error)throw error;
+        }
+        setCloudStatus("同期済み",true);
+        return true;
+      }catch(e){
+        setCloudStatus("同期エラー",false);
+        console.error(e);
+        alert("クラウド同期に失敗しました。Supabase側のテーブル/RLS設定を確認してください。\n\n"+(e.message||e));
+        return false;
+      }
+    }
+    async function pullCloudToLocal(){
+      const user=await connectCloud(); if(!user)return false;
+      setCloudStatus("復元中…",true);
+      try{
+        const [p,f,w]=await Promise.all([
+          sb.from("daily_metrics").select("*").eq("user_id",user.id).order("date"),
+          sb.from("food_entries").select("*").eq("user_id",user.id).order("date"),
+          sb.from("workout_logs").select("*").eq("user_id",user.id).order("date")
+        ]);
+        if(p.error)throw p.error;if(f.error)throw f.error;if(w.error)throw w.error;
+        S.set("progressLogs",(p.data||[]).map(x=>({date:x.date,weight:Number(x.weight||0),sleep:Number(x.sleep||0),waist:Number(x.waist||0),thigh:Number(x.thigh||0),calf:Number(x.calf||0),steps:Number(x.steps||0)})));
+        S.set("foodLogs",(f.data||[]).map(x=>({id:x.id,date:x.date,meal:x.meal,name:x.name,kcal:Number(x.kcal||0),protein:Number(x.protein||0),memo:x.memo||""})));
+        S.set("workoutLogs",(w.data||[]).map(x=>({id:x.id,date:x.date,items:x.items||[]})));
+        renderFood();renderRoutine();renderProgress();renderHome();
+        setCloudStatus("復元済み",true);
+        return true;
+      }catch(e){
+        setCloudStatus("復元エラー",false);
+        alert("クラウドからの復元に失敗しました。\n\n"+(e.message||e));
+        return false;
+      }
+    }
+    function queueCloudSync(){
+      clearTimeout(cloudSyncTimer);
+      cloudSyncTimer=setTimeout(async()=>{
+        const user=await getCloudSession();
+        if(user)pushLocalToCloud();
+      },900);
+    }
 
     function todayFood(){ const d=S.date(); return S.get("foodLogs",[]).filter(x=>x.date===d); }
     function nutrition(){ return todayFood().reduce((a,x)=>({kcal:a.kcal+Number(x.kcal||0),protein:a.protein+Number(x.protein||0)}),{kcal:0,protein:0}); }
@@ -368,7 +508,7 @@
 
       document.querySelectorAll(".delete-food").forEach(btn=>btn.addEventListener("click",()=>{
         S.set("foodLogs",S.get("foodLogs",[]).filter(x=>x.id!==btn.dataset.id));
-        renderFood();renderHome();
+        renderFood();renderHome();queueCloudSync();
       }));
     }
 
@@ -376,11 +516,11 @@
       e.preventDefault();
       const logs=S.get("foodLogs",[]);
       logs.push({
-        id:(window.crypto&&crypto.randomUUID)?crypto.randomUUID():Date.now()+"-"+Math.random(),
+        id:uuid(),
         date:S.date(),meal:$("meal").value,name:$("food-name").value,
         kcal:Number($("food-kcal-input").value),protein:Number($("food-protein-input").value||0),memo:$("food-memo").value
       });
-      S.set("foodLogs",logs);e.target.reset();renderFood();renderHome();
+      S.set("foodLogs",logs);e.target.reset();renderFood();renderHome();queueCloudSync();
     });
 
     function renderRoutine(){
@@ -399,8 +539,8 @@
 
     $("save-workout").addEventListener("click",()=>{
       const items=exercises.map((x,i)=>({name:x[0],weight:Number($("w"+i).value),r1:Number($("r1-"+i).value||0),r2:Number($("r2-"+i).value||0)}));
-      const logs=S.get("workoutLogs",[]);logs.push({date:S.date(),items});S.set("workoutLogs",logs);
-      alert("保存しました");renderRoutine();
+      const logs=S.get("workoutLogs",[]);logs.push({id:uuid(),date:S.date(),items});S.set("workoutLogs",logs);
+      alert("保存しました");renderRoutine();queueCloudSync();
     });
 
     function draw(logs){
@@ -429,7 +569,7 @@
     $("progress-form").addEventListener("submit",e=>{
       e.preventDefault();let logs=S.get("progressLogs",[]);
       const item={date:S.date(),weight:Number($("weight").value),sleep:Number($("sleep").value||0),waist:Number($("waist").value||0),thigh:Number($("thigh").value||0),calf:Number($("calf").value||0),steps:Number($("steps").value||0)};
-      const i=logs.findIndex(x=>x.date===item.date);i>=0?logs[i]=item:logs.push(item);logs.sort((a,b)=>a.date.localeCompare(b.date));S.set("progressLogs",logs);renderProgress();
+      const i=logs.findIndex(x=>x.date===item.date);i>=0?logs[i]=item:logs.push(item);logs.sort((a,b)=>a.date.localeCompare(b.date));S.set("progressLogs",logs);renderProgress();queueCloudSync();
     });
 
     $("export-data").addEventListener("click",()=>{
@@ -442,8 +582,19 @@
       const f=e.target.files?.[0];if(!f)return;
       try{
         const d=JSON.parse(await f.text());["foodLogs","progressLogs","workoutLogs"].forEach(k=>Array.isArray(d[k])&&S.set(k,d[k]));
-        renderFood();renderRoutine();renderProgress();alert("読み込みました");
+        normalizeLocalIds();renderFood();renderRoutine();renderProgress();queueCloudSync();alert("読み込みました");
       }catch{alert("JSONを読み込めませんでした");}
+    });
+
+    $("cloud-connect").addEventListener("click",async()=>{
+      const user=await connectCloud();
+      if(user){await pushLocalToCloud();alert("クラウド接続と初回同期が完了しました。");}
+    });
+    $("cloud-sync").addEventListener("click",async()=>{
+      const ok=await pushLocalToCloud();if(ok)alert("クラウドへ同期しました。");
+    });
+    $("cloud-restore").addEventListener("click",async()=>{
+      if(confirm("クラウド上の記録で、この端末の食事・進捗・筋トレ記録を置き換えますか？"))await pullCloudToLocal();
     });
 
     const isoDate = d => {
@@ -631,6 +782,38 @@
       a.href=url;a.download="diet-os-chatgpt-report-"+S.date()+".json";document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);
     });
 
+    $("cloud-share-report").addEventListener("click",async()=>{
+      if(!currentReport)renderAIReport();
+      const user=await connectCloud();if(!user)return;
+      const path=user.id+"/"+Date.now()+"-"+uuid()+".json";
+      const payload={text:currentReport.text,data:currentReport.data};
+      const body=new Blob([JSON.stringify(payload,null,2)],{type:"application/json"});
+      const up=await sb.storage.from("shared-reports").upload(path,body,{contentType:"application/json",upsert:false});
+      if(up.error){alert("共有ファイルを作成できませんでした。Storage設定を確認してください。\n\n"+up.error.message);return;}
+      const signed=await sb.storage.from("shared-reports").createSignedUrl(path,3600);
+      if(signed.error){alert("共有URLを発行できませんでした。\n\n"+signed.error.message);return;}
+      lastSharePath=path;lastSignedUrl=signed.data.signedUrl;
+      $("share-url").textContent=lastSignedUrl;
+      $("share-url-wrap").style.display="block";
+      try{await navigator.clipboard.writeText(lastSignedUrl);}catch(e){}
+      if(navigator.share){
+        try{await navigator.share({title:"Diet OS 記録",text:"このURLをChatGPTに送ってレビューしてください。1時間有効です。",url:lastSignedUrl});}catch(e){}
+      }else{
+        alert("共有URLをコピーしました。このチャットへ貼り付けてください。");
+      }
+    });
+    $("copy-share-url").addEventListener("click",async()=>{
+      if(!lastSignedUrl)return;
+      await navigator.clipboard.writeText(lastSignedUrl);
+      alert("共有URLをコピーしました。");
+    });
+    $("revoke-share-url").addEventListener("click",async()=>{
+      if(!lastSharePath)return;
+      const {error}=await sb.storage.from("shared-reports").remove([lastSharePath]);
+      if(error){alert("共有の無効化に失敗しました。\n\n"+error.message);return;}
+      lastSharePath=null;lastSignedUrl=null;$("share-url-wrap").style.display="none";alert("共有を無効化しました。");
+    });
+
     document.querySelectorAll(".nav-label").forEach(label=>label.addEventListener("click",()=>{
       setTimeout(()=>{
         if(label.htmlFor==="tab-progress")renderProgress();
@@ -642,7 +825,7 @@
     window.addEventListener("resize",()=>draw(S.get("progressLogs",[]).slice(-30)));
     if("serviceWorker" in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js").catch(()=>{}));
 
-    initTodos();renderFood();renderRoutine();renderProgress();
+    normalizeLocalIds();initTodos();renderFood();renderRoutine();renderProgress();getCloudSession();
   })();
   </script>
 </body>
