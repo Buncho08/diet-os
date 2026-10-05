@@ -281,6 +281,22 @@
       </div>
       <div class="grid">
         <div class="card full">
+          <h2>ChatGPT 継続リンク</h2>
+          <p class="tiny">一度URLを共有すると、Diet OSをクラウド同期するたびに同じURLの中身を更新します。有効期間は30日です。</p>
+          <label class="todo"><input type="checkbox" id="live-body-data"><span>体重・身体サイズも含める</span></label>
+          <div class="cloud-row">
+            <button class="btn" type="button" id="create-live-link">30日リンクを発行</button>
+            <button class="btn secondary" type="button" id="copy-live-link">URLをコピー</button>
+            <button class="btn danger" type="button" id="revoke-live-link">無効化</button>
+          </div>
+          <div id="live-link-wrap" style="display:none;margin-top:10px">
+            <div class="tiny">ChatGPT用URL</div>
+            <div class="share-url" id="live-link"></div>
+          </div>
+          <div class="privacy-note" style="margin-top:10px">目標体重は含めません。身体データは上のチェックをONにした場合だけ共有します。</div>
+        </div>
+
+        <div class="card full">
           <h2>レポート設定</h2>
           <div class="form">
             <label class="field">
@@ -366,6 +382,8 @@
     let cloudSyncTimer=null;
     let lastSharePath=null;
     let lastSignedUrl=null;
+    let liveLink=localStorage.getItem("dietOsLiveLink")||"";
+    let liveBodyData=localStorage.getItem("dietOsLiveBodyData")==="1";
 
     function renderGoalWeight(){
       const goal=S.get("goalWeight",null);
@@ -423,6 +441,20 @@
       setCloudStatus("接続済み",true);
       return cloudUser;
     }
+    async function refreshLiveReport(){
+      if(!liveLink||!cloudUser)return;
+      const d=reportData(14,"all");
+      if(!liveBodyData){
+        d.summary.currentWeight=null;d.summary.weightDelta=null;d.summary.avgWeight=null;
+        d.summary.waist=null;d.summary.thigh=null;d.summary.calf=null;
+        d.progress=(d.progress||[]).map(x=>({date:x.date,sleep:x.sleep||0,steps:x.steps||0}));
+      }
+      const path=cloudUser.id+"/live.json";
+      const body=new Blob([JSON.stringify({updatedAt:new Date().toISOString(),data:d},null,2)],{type:"application/json"});
+      await sb.storage.from("shared-reports").remove([path]);
+      await sb.storage.from("shared-reports").upload(path,body,{contentType:"application/json",upsert:false});
+    }
+
     async function pushLocalToCloud(){
       const user=await connectCloud(); if(!user)return false;
       normalizeLocalIds();
@@ -451,6 +483,7 @@
           if(error)throw error;
         }
         setCloudStatus("同期済み",true);
+        if(liveLink)await refreshLiveReport();
         return true;
       }catch(e){
         setCloudStatus("同期エラー",false);
@@ -635,6 +668,42 @@
     });
     $("cloud-restore").addEventListener("click",async()=>{
       if(confirm("クラウド上の記録で、この端末の食事・進捗・筋トレ記録を置き換えますか？"))await pullCloudToLocal();
+    });
+
+    function renderLiveLink(){
+      $("live-body-data").checked=liveBodyData;
+      $("live-link").textContent=liveLink;
+      $("live-link-wrap").style.display=liveLink?"block":"none";
+    }
+    $("live-body-data").addEventListener("change",async()=>{
+      liveBodyData=$("live-body-data").checked;
+      localStorage.setItem("dietOsLiveBodyData",liveBodyData?"1":"0");
+      if(liveLink){await refreshLiveReport();}
+    });
+    $("create-live-link").addEventListener("click",async()=>{
+      const user=await connectCloud();if(!user)return;
+      liveBodyData=$("live-body-data").checked;
+      localStorage.setItem("dietOsLiveBodyData",liveBodyData?"1":"0");
+      const path=user.id+"/live.json";
+      liveLink="pending";
+      await refreshLiveReport();
+      const signed=await sb.storage.from("shared-reports").createSignedUrl(path,60*60*24*30);
+      if(signed.error){liveLink="";alert("リンク発行に失敗しました。\n\n"+signed.error.message);return;}
+      liveLink=signed.data.signedUrl;
+      localStorage.setItem("dietOsLiveLink",liveLink);
+      renderLiveLink();
+      try{await navigator.clipboard.writeText(liveLink);}catch(e){}
+      alert("30日リンクを発行しました。ChatGPTに一度だけ送ってください。");
+    });
+    $("copy-live-link").addEventListener("click",async()=>{
+      if(!liveLink){alert("先にリンクを発行してください。");return;}
+      try{await navigator.clipboard.writeText(liveLink);alert("URLをコピーしました。");}catch{alert("コピーできませんでした。");}
+    });
+    $("revoke-live-link").addEventListener("click",async()=>{
+      const user=await connectCloud();if(!user)return;
+      await sb.storage.from("shared-reports").remove([user.id+"/live.json"]);
+      liveLink="";localStorage.removeItem("dietOsLiveLink");renderLiveLink();
+      alert("継続リンクを無効化しました。");
     });
 
     const isoDate = d => {
@@ -864,7 +933,7 @@
     window.addEventListener("resize",()=>draw(S.get("progressLogs",[]).slice(-30)));
     if("serviceWorker" in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js").catch(()=>{}));
 
-    normalizeLocalIds();initTodos();renderGoalWeight();renderFood();renderRoutine();renderProgress();getCloudSession();
+    normalizeLocalIds();initTodos();renderGoalWeight();renderLiveLink();renderFood();renderRoutine();renderProgress();getCloudSession();
   })();
   </script>
 </body>
