@@ -1,4 +1,4 @@
-const CACHE = "diet-os-v2";
+const CACHE = "diet-os-v3";
 const APP_SHELL = ["./","./index.html","./manifest.webmanifest","./favicon.svg"];
 
 self.addEventListener("install", event => {
