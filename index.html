@@ -153,6 +153,14 @@
           </div>
         </div>
         <div class="card full">
+          <h2>今日のメニュー</h2>
+          <div class="item"><b>今日の方針</b><div class="tiny" id="format-policy">曜日に合わせて表示します</div></div>
+          <div class="item"><b>食事</b><div class="tiny">朝 / 昼 / 間食 / 夜。1日の目安は1,500〜1,700kcal、P110g前後。</div></div>
+          <div class="item"><b>運動</b><div class="tiny" id="format-workout">曜日に合わせて表示します</div></div>
+          <div class="item"><b>Apple Watch</b><div class="tiny">ムーブ約400kcal / エクササイズ30分以上 / スタンド10〜12時間</div></div>
+        </div>
+
+        <div class="card full">
           <h2>今日これだけ</h2>
           <label class="todo"><input type="checkbox" data-todo="weight"><span>朝、トイレ後・飲食前に体重測定</span></label>
           <label class="todo"><input type="checkbox" data-todo="measure"><span>ウエスト・太もも・ふくらはぎ測定</span></label>
@@ -340,7 +348,10 @@
         $("sleep-ring").style.setProperty("--v",clamp(Number(p.sleep||0)/target.sleep*100,0,100));
       }
       const day=new Date().getDay();
-      $("today-plan").textContent=[1,3,6].includes(day)?"今日はジム日。":"今日は通常日。7,000〜10,000歩で十分。";
+      const type=day===0?"休養日":[1,3,6].includes(day)?"ジム日":"通常日";
+      $("today-plan").textContent=type==="ジム日"?"今日はジム日。":type==="休養日"?"今日は休養日。":"今日は通常日。7,000〜10,000歩で十分。";
+      if($("format-policy")) $("format-policy").textContent=type+" / 1,500〜1,700kcal / P110g前後 / 7,000歩以上 / 睡眠7時間前後";
+      if($("format-workout")) $("format-workout").textContent=type==="ジム日"?"全身筋トレ＋有酸素30〜40分":type==="休養日"?"普段の歩行＋軽いストレッチ":"7,000〜10,000歩＋余裕があれば軽いウォーキング";
     }
 
     function renderFood(){
