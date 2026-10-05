@@ -692,7 +692,9 @@
         });
         const body=await res.json().catch(()=>({}));
         if(!res.ok)throw new Error(body.error||"API発行に失敗しました");
-        apiUrl=body.api_url;
+        const issued=new URL(body.api_url);
+        const token=issued.searchParams.get("token");
+        apiUrl=DIET_API_FUNCTION+"?token="+encodeURIComponent(token||"")+"&days=14";
         localStorage.setItem("dietOsApiUrl",apiUrl);
         localStorage.removeItem("dietOsLiveLink");
         localStorage.removeItem("dietOsLiveBodyData");
