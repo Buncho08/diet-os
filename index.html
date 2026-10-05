@@ -281,19 +281,25 @@
       </div>
       <div class="grid">
         <div class="card full">
-          <h2>ChatGPT 継続リンク</h2>
-          <p class="tiny">一度URLを共有すると、Diet OSをクラウド同期するたびに同じURLの中身を更新します。有効期間は30日です。</p>
-          <label class="todo"><input type="checkbox" id="live-body-data"><span>体重・身体サイズも含める</span></label>
+          <h2>ChatGPT API</h2>
+          <p class="tiny">一度発行した読み取り専用URLから、ChatGPTがSupabaseの最新記録を取得できます。URL自体が鍵なので公開しないでください。</p>
+          <div class="form" style="margin-top:10px">
+            <label class="todo"><input type="checkbox" id="api-food" checked><span>食事</span></label>
+            <label class="todo"><input type="checkbox" id="api-workouts" checked><span>筋トレ</span></label>
+            <label class="todo"><input type="checkbox" id="api-activity" checked><span>歩数・睡眠</span></label>
+            <label class="todo"><input type="checkbox" id="api-weight"><span>体重</span></label>
+            <label class="todo wide"><input type="checkbox" id="api-measurements"><span>ウエスト・太もも・ふくらはぎ</span></label>
+          </div>
           <div class="cloud-row">
-            <button class="btn" type="button" id="create-live-link">30日リンクを発行</button>
-            <button class="btn secondary" type="button" id="copy-live-link">URLをコピー</button>
-            <button class="btn danger" type="button" id="revoke-live-link">無効化</button>
+            <button class="btn" type="button" id="create-api-url">読み取り専用APIを発行</button>
+            <button class="btn secondary" type="button" id="copy-api-url">URLをコピー</button>
+            <button class="btn danger" type="button" id="revoke-api-url">無効化</button>
           </div>
-          <div id="live-link-wrap" style="display:none;margin-top:10px">
-            <div class="tiny">ChatGPT用URL</div>
-            <div class="share-url" id="live-link"></div>
+          <div id="api-url-wrap" style="display:none;margin-top:10px">
+            <div class="tiny">ChatGPT用API URL</div>
+            <div class="share-url" id="api-url"></div>
           </div>
-          <div class="privacy-note" style="margin-top:10px">目標体重は含めません。身体データは上のチェックをONにした場合だけ共有します。</div>
+          <div class="privacy-note" style="margin-top:10px">目標体重はAPIに含めません。体重・身体サイズは上で明示的にONにした場合だけ取得できます。</div>
         </div>
 
         <div class="card full">
@@ -375,6 +381,7 @@
     const target={kcal:1600,protein:110,steps:7000,sleep:7};
     const SUPABASE_URL="https://dygzsficwncawfkyuvoy.supabase.co";
     const SUPABASE_PUBLISHABLE_KEY="sb_publishable_kjjXKV3-gLiFKuLvTA9nUA_vnVAogFN";
+    const DIET_API_FUNCTION=SUPABASE_URL+"/functions/v1/diet-data";
     const sb=window.supabase?.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{
       auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}
     });
@@ -382,8 +389,7 @@
     let cloudSyncTimer=null;
     let lastSharePath=null;
     let lastSignedUrl=null;
-    let liveLink=localStorage.getItem("dietOsLiveLink")||"";
-    let liveBodyData=localStorage.getItem("dietOsLiveBodyData")==="1";
+    let apiUrl=localStorage.getItem("dietOsApiUrl")||"";
 
     function renderGoalWeight(){
       const goal=S.get("goalWeight",null);
@@ -441,20 +447,6 @@
       setCloudStatus("接続済み",true);
       return cloudUser;
     }
-    async function refreshLiveReport(){
-      if(!liveLink||!cloudUser)return;
-      const d=reportData(14,"all");
-      if(!liveBodyData){
-        d.summary.currentWeight=null;d.summary.weightDelta=null;d.summary.avgWeight=null;
-        d.summary.waist=null;d.summary.thigh=null;d.summary.calf=null;
-        d.progress=(d.progress||[]).map(x=>({date:x.date,sleep:x.sleep||0,steps:x.steps||0}));
-      }
-      const path=cloudUser.id+"/live.json";
-      const body=new Blob([JSON.stringify({updatedAt:new Date().toISOString(),data:d},null,2)],{type:"application/json"});
-      await sb.storage.from("shared-reports").remove([path]);
-      await sb.storage.from("shared-reports").upload(path,body,{contentType:"application/json",upsert:false});
-    }
-
     async function pushLocalToCloud(){
       const user=await connectCloud(); if(!user)return false;
       normalizeLocalIds();
@@ -483,7 +475,6 @@
           if(error)throw error;
         }
         setCloudStatus("同期済み",true);
-        if(liveLink)await refreshLiveReport();
         return true;
       }catch(e){
         setCloudStatus("同期エラー",false);
@@ -670,40 +661,64 @@
       if(confirm("クラウド上の記録で、この端末の食事・進捗・筋トレ記録を置き換えますか？"))await pullCloudToLocal();
     });
 
-    function renderLiveLink(){
-      $("live-body-data").checked=liveBodyData;
-      $("live-link").textContent=liveLink;
-      $("live-link-wrap").style.display=liveLink?"block":"none";
+    function renderApiUrl(){
+      $("api-url").textContent=apiUrl;
+      $("api-url-wrap").style.display=apiUrl?"block":"none";
     }
-    $("live-body-data").addEventListener("change",async()=>{
-      liveBodyData=$("live-body-data").checked;
-      localStorage.setItem("dietOsLiveBodyData",liveBodyData?"1":"0");
-      if(liveLink){await refreshLiveReport();}
+    function selectedApiScopes(){
+      return {
+        food:$("api-food").checked,
+        workouts:$("api-workouts").checked,
+        activity:$("api-activity").checked,
+        weight:$("api-weight").checked,
+        measurements:$("api-measurements").checked
+      };
+    }
+    async function currentAccessToken(){
+      const user=await connectCloud();if(!user)return null;
+      const {data}=await sb.auth.getSession();
+      return data.session?.access_token||null;
+    }
+    $("create-api-url").addEventListener("click",async()=>{
+      const scopes=selectedApiScopes();
+      if(!Object.values(scopes).some(Boolean)){alert("取得項目を1つ以上選んでください。");return;}
+      const accessToken=await currentAccessToken();if(!accessToken)return;
+      const ok=await pushLocalToCloud();if(!ok)return;
+      try{
+        const res=await fetch(DIET_API_FUNCTION,{
+          method:"POST",
+          headers:{"Content-Type":"application/json","Authorization":"Bearer "+accessToken},
+          body:JSON.stringify({scopes})
+        });
+        const body=await res.json().catch(()=>({}));
+        if(!res.ok)throw new Error(body.error||"API発行に失敗しました");
+        apiUrl=body.api_url;
+        localStorage.setItem("dietOsApiUrl",apiUrl);
+        localStorage.removeItem("dietOsLiveLink");
+        localStorage.removeItem("dietOsLiveBodyData");
+        renderApiUrl();
+        try{await navigator.clipboard.writeText(apiUrl);}catch(e){}
+        alert("読み取り専用APIを発行しました。URLをChatGPTに一度送ってください。");
+      }catch(e){alert("API発行に失敗しました。\n\n"+(e.message||e));}
     });
-    $("create-live-link").addEventListener("click",async()=>{
-      const user=await connectCloud();if(!user)return;
-      liveBodyData=$("live-body-data").checked;
-      localStorage.setItem("dietOsLiveBodyData",liveBodyData?"1":"0");
-      const path=user.id+"/live.json";
-      liveLink="pending";
-      await refreshLiveReport();
-      const signed=await sb.storage.from("shared-reports").createSignedUrl(path,60*60*24*30);
-      if(signed.error){liveLink="";alert("リンク発行に失敗しました。\n\n"+signed.error.message);return;}
-      liveLink=signed.data.signedUrl;
-      localStorage.setItem("dietOsLiveLink",liveLink);
-      renderLiveLink();
-      try{await navigator.clipboard.writeText(liveLink);}catch(e){}
-      alert("30日リンクを発行しました。ChatGPTに一度だけ送ってください。");
+    $("copy-api-url").addEventListener("click",async()=>{
+      if(!apiUrl){alert("先にAPIを発行してください。");return;}
+      try{await navigator.clipboard.writeText(apiUrl);alert("API URLをコピーしました。");}
+      catch{alert("コピーできませんでした。URLを長押ししてコピーしてください。");}
     });
-    $("copy-live-link").addEventListener("click",async()=>{
-      if(!liveLink){alert("先にリンクを発行してください。");return;}
-      try{await navigator.clipboard.writeText(liveLink);alert("URLをコピーしました。");}catch{alert("コピーできませんでした。");}
-    });
-    $("revoke-live-link").addEventListener("click",async()=>{
-      const user=await connectCloud();if(!user)return;
-      await sb.storage.from("shared-reports").remove([user.id+"/live.json"]);
-      liveLink="";localStorage.removeItem("dietOsLiveLink");renderLiveLink();
-      alert("継続リンクを無効化しました。");
+    $("revoke-api-url").addEventListener("click",async()=>{
+      if(!apiUrl){alert("有効なAPIはありません。");return;}
+      if(!confirm("ChatGPT用の読み取りAPIを無効化しますか？"))return;
+      const accessToken=await currentAccessToken();if(!accessToken)return;
+      try{
+        const res=await fetch(DIET_API_FUNCTION,{method:"DELETE",headers:{"Authorization":"Bearer "+accessToken}});
+        const body=await res.json().catch(()=>({}));
+        if(!res.ok)throw new Error(body.error||"無効化に失敗しました");
+        apiUrl="";
+        localStorage.removeItem("dietOsApiUrl");
+        renderApiUrl();
+        alert("APIを無効化しました。");
+      }catch(e){alert("無効化に失敗しました。\n\n"+(e.message||e));}
     });
 
     const isoDate = d => {
@@ -933,7 +948,7 @@
     window.addEventListener("resize",()=>draw(S.get("progressLogs",[]).slice(-30)));
     if("serviceWorker" in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js").catch(()=>{}));
 
-    normalizeLocalIds();initTodos();renderGoalWeight();renderLiveLink();renderFood();renderRoutine();renderProgress();getCloudSession();
+    normalizeLocalIds();initTodos();renderGoalWeight();renderApiUrl();renderFood();renderRoutine();renderProgress();getCloudSession();
   })();
   </script>
 </body>
