@@ -126,7 +126,7 @@
   <input class="tab-radio" type="radio" name="tabs" id="tab-ai">
 
   <main class="app">
-    <header><div class="brand"><b>DIET OS</b><span>67kg → 55kg / 3月末</span></div></header>
+    <header><div class="brand"><b>DIET OS</b><span id="header-goal" style="display:none"></span></div></header>
 
     <section class="page" id="home">
       <div class="hero">
@@ -220,6 +220,19 @@
     <section class="page" id="progress">
       <div class="hero"><div class="eyebrow">PROGRESS</div><h1>進捗</h1><p class="muted">毎日測ってOK。評価は7日平均。</p></div>
       <div class="grid">
+        <div class="card full">
+          <h2>目標体重</h2>
+          <div class="form">
+            <label class="field">
+              <span>目標体重 kg（任意）</span>
+              <input id="goal-weight" type="number" step="0.1" placeholder="未登録">
+            </label>
+            <button class="btn" type="button" id="save-goal-weight">登録</button>
+            <button class="btn secondary wide" type="button" id="clear-goal-weight">登録を解除</button>
+          </div>
+          <p class="tiny">未登録の間はサイト上に目標体重を表示しません。この値はChatGPT相談用レポートには含めません。</p>
+        </div>
+
         <div class="card full">
           <h2>今日の記録</h2>
           <form class="form" id="progress-form">
@@ -353,6 +366,20 @@
     let cloudSyncTimer=null;
     let lastSharePath=null;
     let lastSignedUrl=null;
+
+    function renderGoalWeight(){
+      const goal=S.get("goalWeight",null);
+      const header=$("header-goal");
+      if(goal && Number(goal)>0){
+        header.textContent="目標 "+Number(goal).toFixed(1).replace(".0","")+"kg";
+        header.style.display="";
+        $("goal-weight").value=goal;
+      }else{
+        header.textContent="";
+        header.style.display="none";
+        $("goal-weight").value="";
+      }
+    }
     const exercises=[
       ["Seated Leg Curl",10,"10〜12"],["Hip Abduction",20,"12〜15"],["Glute Drive / Hip Thrust",17.5,"10〜12"],
       ["Lat Pulldown",15,"10〜12"],["Seated Row",15,"10〜12"],["Chest Press",10,"10〜12"],["Abdominal Crunch",12.5,"12〜15"]
@@ -572,6 +599,19 @@
       const i=logs.findIndex(x=>x.date===item.date);i>=0?logs[i]=item:logs.push(item);logs.sort((a,b)=>a.date.localeCompare(b.date));S.set("progressLogs",logs);renderProgress();queueCloudSync();
     });
 
+    $("save-goal-weight").addEventListener("click",()=>{
+      const v=Number($("goal-weight").value);
+      if(!v || v<=0){alert("目標体重を入力してください。");return;}
+      S.set("goalWeight",v);
+      renderGoalWeight();
+      alert("目標体重を登録しました。");
+    });
+
+    $("clear-goal-weight").addEventListener("click",()=>{
+      localStorage.removeItem("goalWeight");
+      renderGoalWeight();
+    });
+
     $("export-data").addEventListener("click",()=>{
       const data={foodLogs:S.get("foodLogs",[]),progressLogs:S.get("progressLogs",[]),workoutLogs:S.get("workoutLogs",[])};
       const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"}),url=URL.createObjectURL(blob),a=document.createElement("a");
@@ -685,7 +725,6 @@
     function buildReport(days,scope){
       const d=reportData(days,scope),s=d.summary,lines=[];
       lines.push("Diet OSの記録をレビューしてください。");
-      lines.push("目標：168cm / 67kg開始 → 55kg、週3回ジム、摂取目安1,500〜1,700kcal、Protein 110g。");
       lines.push("対象期間："+d.period.from+"〜"+d.period.to+"（"+days+"日）");
       lines.push("");
       lines.push("【サマリー】");
@@ -744,7 +783,7 @@
       }
 
       lines.push("");
-      lines.push("この記録を踏まえて、①進捗評価 ②食事 ③運動 ④睡眠・活動量 ⑤次の7日間で変えること、の順に具体的にレビューしてください。短期的な体重変動に反応しすぎず、7日平均を重視してください。");
+      lines.push("この記録を踏まえて、①進捗評価 ②食事 ③運動 ④睡眠・活動量 ⑤次の7日間で変えること、の順に具体的にレビューしてください。短期的な体重変動に反応しすぎず、記録の傾向を重視してください。");
       return {text:lines.join("\n"),data:d};
     }
 
@@ -825,7 +864,7 @@
     window.addEventListener("resize",()=>draw(S.get("progressLogs",[]).slice(-30)));
     if("serviceWorker" in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js").catch(()=>{}));
 
-    normalizeLocalIds();initTodos();renderFood();renderRoutine();renderProgress();getCloudSession();
+    normalizeLocalIds();initTodos();renderGoalWeight();renderFood();renderRoutine();renderProgress();getCloudSession();
   })();
   </script>
 </body>
