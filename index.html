@@ -90,6 +90,10 @@
     .list{display:grid;gap:8px}
     .item{padding:11px;border:1px solid var(--line);border-radius:12px;background:var(--surface2)}
     .item-row{display:flex;justify-content:space-between;gap:10px;align-items:center}
+    .plan-memo{width:100%;box-sizing:border-box;margin-top:9px;min-height:42px;border:1px solid var(--line);border-radius:10px;background:#0d1318;color:var(--text);padding:9px 10px;font:inherit}
+    .plan-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+    .plan-actions .memo-only{grid-column:1/-1}
+
     .exercise{padding:12px;border:1px solid var(--line);border-radius:14px;background:var(--surface2);margin:9px 0}
     .exercise-head{display:flex;justify-content:space-between;gap:10px;align-items:center}
     .exercise-inputs{display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:8px;margin-top:10px}
@@ -194,12 +198,23 @@
     </section>
 
     <section class="page" id="gym">
-      <div class="hero"><div class="eyebrow">GYM</div><h1>週3ルーティン</h1><p class="muted">ウォームアップ → マシン → 有酸素</p></div>
+      <div class="hero">
+        <div class="eyebrow">MOVE</div>
+        <h1>今日の運動</h1>
+        <p class="muted">ChatGPTが今日の状態に合わせて決めた内容だけを表示します。</p>
+      </div>
       <div class="grid">
-        <div class="card full"><h2>ウォームアップ</h2><p>トレッドミル 8〜10分</p><p class="tiny">傾斜 1〜3% / 4.5〜5.2km/h</p></div>
-        <div class="card full"><h2>筋トレ</h2><div id="routine"></div><button class="btn" type="button" id="save-workout">今日の実績を保存</button></div>
-        <div class="card full"><h2>最後の有酸素</h2><p>30〜40分</p><p class="tiny">傾斜 0〜3% / 4.5〜5.5km/h / 心拍ゾーン2〜低め3</p></div>
-        <div class="card full"><p class="warn">腰に痛みが出たレッグプレスは一旦除外。重りは戻すときもコントロールして、ガチャンと落とさない。</p></div>
+        <div class="card full">
+          <div class="status">
+            <h2>運動・筋トレメニュー</h2>
+            <button class="btn secondary" type="button" id="refresh-gym-plan" style="width:auto;min-height:36px;padding:6px 10px">更新</button>
+          </div>
+          <div id="gym-plan-summary" class="tiny">読み込み中…</div>
+          <div id="gym-plan-items" class="list" style="margin-top:10px"></div>
+        </div>
+        <div class="card full">
+          <p class="tiny">この画面の内容も毎朝更新されます。筋トレ日なら種目・重量・回数・セット数、有酸素日なら時間・強度までChatGPTが指定します。</p>
+        </div>
       </div>
     </section>
 
@@ -483,7 +498,7 @@
         S.set("progressLogs",(p.data||[]).map(x=>({date:x.date,weight:Number(x.weight||0),sleep:Number(x.sleep||0),waist:Number(x.waist||0),thigh:Number(x.thigh||0),calf:Number(x.calf||0),steps:Number(x.steps||0)})));
         S.set("foodLogs",(f.data||[]).map(x=>({id:x.id,date:x.date,meal:x.meal,name:x.name,kcal:Number(x.kcal||0),protein:Number(x.protein||0),memo:x.memo||""})));
         S.set("workoutLogs",(w.data||[]).map(x=>({id:x.id,date:x.date,items:x.items||[]})));
-        renderFood();renderRoutine();renderProgress();renderHome();
+        renderFood();renderProgress();renderHome();loadDailyPlan();
         setCloudStatus("復元済み",true);
         return true;
       }catch(e){
@@ -534,6 +549,47 @@
     function planStatusClass(status){
       return status==="done"?"pill":status==="skipped"?"pill warn":"pill";
     }
+    function isExercisePlanItem(x){
+      return ["strength","cardio","recovery"].includes(x.category);
+    }
+    function planItemHtml(x){
+      return `
+        <div class="item">
+          <div class="item-row">
+            <div>
+              <b>${esc(x.title)}</b>
+              <div class="tiny">${esc(x.detail||"")}</div>
+              <span class="${planStatusClass(x.status)}">${planStatusLabel(x.status)}</span>
+            </div>
+          </div>
+          <textarea class="plan-memo" id="plan-memo-${x.id}" placeholder="メモ（重さ、回数、きつさ、できなかった理由など）">${esc(x.memo||"")}</textarea>
+          <div class="plan-actions">
+            <button class="btn plan-status" type="button" data-id="${x.id}" data-status="done">やった</button>
+            <button class="btn secondary plan-status" type="button" data-id="${x.id}" data-status="skipped">やってない</button>
+            <button class="btn secondary memo-only plan-memo-save" type="button" data-id="${x.id}">メモだけ保存</button>
+          </div>
+        </div>`;
+    }
+    function bindPlanControls(root){
+      root.querySelectorAll(".plan-status").forEach(btn=>btn.addEventListener("click",async()=>{
+        const memo=root.querySelector("#plan-memo-"+CSS.escape(btn.dataset.id))?.value||"";
+        await updatePlanItem(btn.dataset.id,btn.dataset.status,memo);
+      }));
+      root.querySelectorAll(".plan-memo-save").forEach(btn=>btn.addEventListener("click",async()=>{
+        const memo=root.querySelector("#plan-memo-"+CSS.escape(btn.dataset.id))?.value||"";
+        await updatePlanItem(btn.dataset.id,undefined,memo);
+      }));
+    }
+    function renderPlanViews(plan,items){
+      $("daily-plan-summary").textContent=(plan?.title||"今日のプラン")+(plan?.summary?" — "+plan.summary:"");
+      $("daily-plan-items").innerHTML=items.length?items.map(planItemHtml).join(""):'<p class="tiny">項目なし。</p>';
+      bindPlanControls($("daily-plan-items"));
+
+      const exerciseItems=items.filter(isExercisePlanItem);
+      $("gym-plan-summary").textContent=plan?.summary||"今日の運動メニュー";
+      $("gym-plan-items").innerHTML=exerciseItems.length?exerciseItems.map(planItemHtml).join(""):'<p class="tiny">今日は運動・筋トレの指定なし。</p>';
+      bindPlanControls($("gym-plan-items"));
+    }
     async function planAccessToken(){
       const user=await connectCloud();if(!user)return null;
       const {data}=await sb.auth.getSession();
@@ -544,6 +600,8 @@
       if(!accessToken)return;
       $("daily-plan-summary").textContent="読み込み中…";
       $("daily-plan-items").innerHTML="";
+      $("gym-plan-summary").textContent="読み込み中…";
+      $("gym-plan-items").innerHTML="";
       try{
         const res=await fetch(DAILY_PLAN_FUNCTION+"?date="+encodeURIComponent(S.date()),{
           headers:{"Authorization":"Bearer "+accessToken}
@@ -553,40 +611,27 @@
         if(!body.plan){
           $("daily-plan-summary").textContent="今日のプランはまだ登録されていません。";
           $("daily-plan-items").innerHTML='<p class="tiny">ChatGPTが登録するとここに表示されます。</p>';
+          $("gym-plan-summary").textContent="今日の運動メニューはまだ登録されていません。";
+          $("gym-plan-items").innerHTML='<p class="tiny">ChatGPTが登録するとここに表示されます。</p>';
           return;
         }
-        $("daily-plan-summary").textContent=(body.plan.title||"今日のプラン")+(body.plan.summary?" — "+body.plan.summary:"");
-        const items=body.items||[];
-        $("daily-plan-items").innerHTML=items.length?items.map(x=>`
-          <div class="item">
-            <div class="item-row">
-              <div>
-                <b>${esc(x.title)}</b>
-                <div class="tiny">${esc(x.detail||"")}</div>
-                <span class="${planStatusClass(x.status)}">${planStatusLabel(x.status)}</span>
-              </div>
-            </div>
-            <div class="cloud-row" style="margin-top:8px">
-              <button class="btn plan-status" type="button" data-id="${x.id}" data-status="done">やった</button>
-              <button class="btn secondary plan-status" type="button" data-id="${x.id}" data-status="skipped">やってない</button>
-              <button class="btn secondary plan-status" type="button" data-id="${x.id}" data-status="pending">未実施に戻す</button>
-            </div>
-          </div>`).join(""):'<p class="tiny">項目なし。</p>';
-        document.querySelectorAll(".plan-status").forEach(btn=>btn.addEventListener("click",async()=>{
-          await updatePlanItem(btn.dataset.id,btn.dataset.status);
-        }));
+        renderPlanViews(body.plan,body.items||[]);
       }catch(e){
         $("daily-plan-summary").textContent="読み込みエラー";
         $("daily-plan-items").innerHTML='<p class="warn">'+esc(e.message||e)+'</p>';
+        $("gym-plan-summary").textContent="読み込みエラー";
+        $("gym-plan-items").innerHTML='<p class="warn">'+esc(e.message||e)+'</p>';
       }
     }
-    async function updatePlanItem(itemId,status){
+    async function updatePlanItem(itemId,status,memo){
       const accessToken=await planAccessToken();if(!accessToken)return;
       try{
+        const payload={item_id:itemId,memo:memo||""};
+        if(status!==undefined)payload.status=status;
         const res=await fetch(DAILY_PLAN_FUNCTION,{
           method:"PATCH",
           headers:{"Content-Type":"application/json","Authorization":"Bearer "+accessToken},
-          body:JSON.stringify({item_id:itemId,status})
+          body:JSON.stringify(payload)
         });
         const body=await res.json().catch(()=>({}));
         if(!res.ok)throw new Error(body.error||"更新できませんでした");
@@ -594,6 +639,7 @@
       }catch(e){alert("予定の更新に失敗しました。\n\n"+(e.message||e));}
     }
     $("refresh-daily-plan").addEventListener("click",loadDailyPlan);
+    $("refresh-gym-plan").addEventListener("click",loadDailyPlan);
 
     function renderFood(){
       const n=nutrition();
@@ -622,26 +668,6 @@
         kcal:Number($("food-kcal-input").value),protein:Number($("food-protein-input").value||0),memo:$("food-memo").value
       });
       S.set("foodLogs",logs);e.target.reset();renderFood();renderHome();queueCloudSync();
-    });
-
-    function renderRoutine(){
-      const prev=latest(S.get("workoutLogs",[]));
-      $("routine").innerHTML=exercises.map((x,i)=>{
-        const p=prev?.items?.find(y=>y.name===x[0]);
-        return `<div class="exercise">
-          <div class="exercise-head"><div><b>${i+1}. ${x[0]}</b><div class="tiny">目安 ${x[1]}kg / ${x[2]} reps ×2</div></div><span class="pill">${p?"前回 "+p.weight+"kg":"初回"}</span></div>
-          <div class="exercise-inputs">
-            <label class="field"><span>重量 kg</span><input id="w${i}" type="number" step="0.5" value="${p?.weight??x[1]}"></label>
-            <label class="field"><span>Set 1</span><input id="r1-${i}" type="number" value="${p?.r1??""}"></label>
-            <label class="field"><span>Set 2</span><input id="r2-${i}" type="number" value="${p?.r2??""}"></label>
-          </div></div>`;
-      }).join("");
-    }
-
-    $("save-workout").addEventListener("click",()=>{
-      const items=exercises.map((x,i)=>({name:x[0],weight:Number($("w"+i).value),r1:Number($("r1-"+i).value||0),r2:Number($("r2-"+i).value||0)}));
-      const logs=S.get("workoutLogs",[]);logs.push({id:uuid(),date:S.date(),items});S.set("workoutLogs",logs);
-      alert("保存しました");renderRoutine();queueCloudSync();
     });
 
     function draw(logs){
@@ -696,7 +722,7 @@
       const f=e.target.files?.[0];if(!f)return;
       try{
         const d=JSON.parse(await f.text());["foodLogs","progressLogs","workoutLogs"].forEach(k=>Array.isArray(d[k])&&S.set(k,d[k]));
-        normalizeLocalIds();renderFood();renderRoutine();renderProgress();queueCloudSync();alert("読み込みました");
+        normalizeLocalIds();renderFood();renderProgress();loadDailyPlan();queueCloudSync();alert("読み込みました");
       }catch{alert("JSONを読み込めませんでした");}
     });
 
@@ -1000,7 +1026,7 @@
     window.addEventListener("resize",()=>draw(S.get("progressLogs",[]).slice(-30)));
     if("serviceWorker" in navigator)window.addEventListener("load",async()=>{try{const r=await navigator.serviceWorker.register("./sw.js?v=5");await r.update();}catch(e){console.warn("Service Worker update failed",e);}});
 
-    normalizeLocalIds();renderGoalWeight();renderApiUrl();renderFood();renderRoutine();renderProgress();getCloudSession();loadDailyPlan();
+    normalizeLocalIds();renderGoalWeight();renderApiUrl();renderFood();renderProgress();getCloudSession();loadDailyPlan();
   })();
   </script>
 </body>
