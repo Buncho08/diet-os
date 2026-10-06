@@ -998,7 +998,7 @@
     }));
 
     window.addEventListener("resize",()=>draw(S.get("progressLogs",[]).slice(-30)));
-    if("serviceWorker" in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js").catch(()=>{}));
+    if("serviceWorker" in navigator)window.addEventListener("load",async()=>{try{const r=await navigator.serviceWorker.register("./sw.js?v=5");await r.update();}catch(e){console.warn("Service Worker update failed",e);}});
 
     normalizeLocalIds();renderGoalWeight();renderApiUrl();renderFood();renderRoutine();renderProgress();getCloudSession();loadDailyPlan();
   })();
