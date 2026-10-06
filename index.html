@@ -116,6 +116,39 @@
     #tab-progress:checked~.bottom-nav label[for=tab-progress],
     #tab-ai:checked~.bottom-nav label[for=tab-ai]{background:var(--surface2);color:var(--green)}
     .status{display:flex;justify-content:space-between;gap:12px;align-items:center}
+    .today-hero{padding:18px 18px 16px}
+    .today-hero h1{font-size:clamp(2rem,9vw,3.8rem);margin:.3rem 0 .45rem}
+    .hero-row{display:flex;align-items:flex-end;justify-content:space-between;gap:16px}
+    .hero-progress{text-align:right;min-width:92px}
+    .hero-progress strong{display:block;font-size:1.65rem;line-height:1}
+    .hero-progress span{font-size:.72rem;color:var(--muted)}
+    .progress-track{height:7px;border-radius:999px;background:#0d1318;border:1px solid var(--line);overflow:hidden;margin-top:12px}
+    .progress-track i{display:block;height:100%;width:0;background:var(--green);transition:width .2s ease}
+    .quick-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+    .quick-stat{padding:12px;border:1px solid var(--line);border-radius:14px;background:var(--surface)}
+    .quick-stat b{display:block;font-size:1.18rem;margin-top:3px}
+    .quick-stat span{font-size:.68rem;color:var(--muted)}
+    .plan-section-label{margin:14px 0 7px;font-size:.72rem;letter-spacing:.08em;color:var(--muted);font-weight:800}
+    .plan-card{padding:13px;border:1px solid var(--line);border-radius:14px;background:var(--surface2)}
+    .plan-card.done{border-color:rgba(166,239,109,.38);background:rgba(166,239,109,.055)}
+    .plan-card.skipped{border-color:rgba(255,123,123,.38);background:rgba(255,123,123,.045)}
+    .plan-card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+    .plan-category{display:inline-block;margin-bottom:5px;font-size:.66rem;font-weight:900;letter-spacing:.08em;color:var(--green)}
+    .plan-detail{margin-top:4px;font-size:.78rem;color:var(--muted);line-height:1.45}
+    .plan-state{white-space:nowrap;font-size:.68rem;padding:4px 7px;border:1px solid var(--line);border-radius:999px;color:var(--muted)}
+    .plan-card.done .plan-state{color:var(--green);border-color:rgba(166,239,109,.35)}
+    .plan-card.skipped .plan-state{color:var(--red);border-color:rgba(255,123,123,.35)}
+    .plan-memo{min-height:40px!important;resize:vertical}
+    .plan-actions{grid-template-columns:1fr 1fr}
+    .plan-actions .btn{min-height:40px;padding:8px 10px}
+    .plan-reset{margin-top:7px;border:0;background:transparent;color:var(--muted);font-size:.7rem;padding:4px 0}
+    .subtle-card{background:transparent;border-style:dashed}
+    details.advanced{border:1px solid var(--line);border-radius:14px;background:var(--surface);padding:13px}
+    details.advanced summary{cursor:pointer;font-weight:800}
+    @media(max-width:520px){
+      .quick-grid{grid-template-columns:1fr 1fr}
+      .hero-row{align-items:flex-start}
+    }
     @media(max-width:520px){
       .grid{grid-template-columns:1fr}.card{grid-column:1}.full{grid-column:1}
       .exercise-inputs{grid-template-columns:1fr 1fr}.exercise-inputs label:first-child{grid-column:1/-1}
@@ -133,49 +166,57 @@
     <header><div class="brand"><b>DIET OS</b><span id="header-goal" style="display:none"></span></div></header>
 
     <section class="page" id="home">
-      <div class="hero">
-        <div class="eyebrow">TODAY</div>
-        <h1>今日やることだけ。</h1>
-        <p class="muted">記録と、ChatGPTが決めた今日のプランを表示します。</p>
-      </div>
-      <div class="grid">
-        <div class="card">
-          <h2>今日の食事</h2>
-          <div class="metric"><span id="home-kcal">0</span> <small>kcal</small></div>
-          <div class="bar"><i id="home-kcal-bar"></i></div>
-          <p class="tiny">Protein <b id="home-protein">0</b> / 110g</p>
-        </div>
-        <div class="card">
-          <h2>最新体重</h2>
-          <div class="metric"><span id="home-weight">--</span> <small>kg</small></div>
-          <p class="tiny" id="home-weight-date">未登録</p>
-        </div>
-        <div class="card full">
-          <div class="status"><h2>今日のリング</h2><span class="tiny">Apple Watch連携は将来対応</span></div>
-          <div class="rings">
-            <div class="ring" id="steps-ring" style="--c:var(--green)"><b>歩数</b></div>
-            <div class="ring" id="sleep-ring" style="--c:var(--blue)"><b>睡眠</b></div>
-            <div>
-              <div class="metric" id="home-steps">--</div><div class="tiny">steps</div>
-              <div style="height:8px"></div>
-              <div class="metric" id="home-sleep">--</div><div class="tiny">hours</div>
-            </div>
+      <div class="hero today-hero">
+        <div class="hero-row">
+          <div>
+            <div class="eyebrow">TODAY</div>
+            <h1>今日これだけ。</h1>
+            <p class="muted" id="today-date-label">ChatGPTが今日のプランを決めます。</p>
+          </div>
+          <div class="hero-progress">
+            <strong id="plan-progress-count">-- / --</strong>
+            <span>完了</span>
           </div>
         </div>
+        <div class="progress-track"><i id="plan-progress-bar"></i></div>
+      </div>
+
+      <div class="grid">
         <div class="card full">
           <div class="status">
-            <h2>今日のプラン</h2>
+            <div>
+              <h2 style="margin-bottom:3px">今日のプラン</h2>
+              <div id="daily-plan-summary" class="tiny">読み込み中…</div>
+            </div>
             <button class="btn secondary" type="button" id="refresh-daily-plan" style="width:auto;min-height:36px;padding:6px 10px">更新</button>
           </div>
-          <div id="daily-plan-summary" class="tiny">読み込み中…</div>
-          <div id="daily-plan-items" class="list" style="margin-top:10px"></div>
+          <div id="daily-plan-items" style="margin-top:12px"></div>
+        </div>
+
+        <div class="card full subtle-card">
+          <h2>今日の記録</h2>
+          <div class="quick-grid">
+            <div class="quick-stat"><span>摂取</span><b><span id="home-kcal">0</span> kcal</b></div>
+            <div class="quick-stat"><span>Protein</span><b><span id="home-protein">0</span> g</b></div>
+            <div class="quick-stat"><span>歩数</span><b id="home-steps">--</b></div>
+            <div class="quick-stat"><span>睡眠</span><b><span id="home-sleep">--</span> h</b></div>
+          </div>
+          <div style="display:none">
+            <span id="home-weight">--</span><span id="home-weight-date"></span>
+            <div id="home-kcal-bar"></div><div id="steps-ring"></div><div id="sleep-ring"></div>
+          </div>
         </div>
       </div>
     </section>
 
     <section class="page" id="food">
-      <div class="hero"><div class="eyebrow">FOOD</div><h1>食事</h1><p class="muted">1,600kcal前後 / Protein 110g</p></div>
+      <div class="hero"><div class="eyebrow">FOOD</div><h1>食事</h1><p class="muted">今日の指示を確認して、食べたものだけ記録。</p></div>
       <div class="grid">
+        <div class="card full">
+          <h2>今日の食事プラン</h2>
+          <div id="food-plan-summary" class="tiny">読み込み中…</div>
+          <div id="food-plan-items" style="margin-top:10px"></div>
+        </div>
         <div class="card full">
           <h2>今日の合計</h2>
           <div class="metric"><span id="food-kcal">0</span> <small>/ 1600 kcal</small></div>
@@ -219,7 +260,7 @@
     </section>
 
     <section class="page" id="progress">
-      <div class="hero"><div class="eyebrow">PROGRESS</div><h1>進捗</h1><p class="muted">毎日測ってOK。評価は7日平均。</p></div>
+      <div class="hero"><div class="eyebrow">LOG</div><h1>記録</h1><p class="muted">体重・睡眠・歩数など、判断材料を残します。</p></div>
       <div class="grid">
         <div class="card full">
           <h2>目標体重</h2>
@@ -276,9 +317,9 @@
 
     <section class="page" id="ai">
       <div class="hero">
-        <div class="eyebrow">AI REVIEW</div>
-        <h1>ChatGPTに相談</h1>
-        <p class="muted">端末内の記録から、相談用レポートを自動生成します。</p>
+        <div class="eyebrow">SETTINGS</div>
+        <h1>連携・設定</h1>
+        <p class="muted">クラウド同期とChatGPT連携の設定です。普段は触らなくてOK。</p>
       </div>
       <div class="grid">
         <div class="card full">
@@ -358,11 +399,11 @@
 
   <nav class="bottom-nav" aria-label="メインナビゲーション">
     <div class="bottom-inner">
-      <label class="nav-label" for="tab-home"><strong>⌂</strong>ホーム</label>
-      <label class="nav-label" for="tab-food"><strong>◫</strong>食事</label>
-      <label class="nav-label" for="tab-gym"><strong>▲</strong>ジム</label>
-      <label class="nav-label" for="tab-progress"><strong>↗</strong>進捗</label>
-      <label class="nav-label" for="tab-ai"><strong>✦</strong>AI相談</label>
+      <label class="nav-label" for="tab-home"><strong>●</strong>今日</label>
+      <label class="nav-label" for="tab-food"><strong>□</strong>食事</label>
+      <label class="nav-label" for="tab-gym"><strong>▲</strong>運動</label>
+      <label class="nav-label" for="tab-progress"><strong>↗</strong>記録</label>
+      <label class="nav-label" for="tab-ai"><strong>⚙</strong>設定</label>
     </div>
   </nav>
 
@@ -543,51 +584,82 @@
 
     }
 
+    const categoryLabel={
+      food:"食事",strength:"筋トレ",cardio:"有酸素",steps:"歩数",sleep:"睡眠",recovery:"回復",other:"その他"
+    };
+    const categoryOrder=["strength","cardio","recovery","steps","food","sleep","other"];
+
     function planStatusLabel(status){
-      return status==="done"?"やった":status==="skipped"?"やってない":"未実施";
-    }
-    function planStatusClass(status){
-      return status==="done"?"pill":status==="skipped"?"pill warn":"pill";
+      return status==="done"?"完了":status==="skipped"?"未達":"未実施";
     }
     function isExercisePlanItem(x){
       return ["strength","cardio","recovery"].includes(x.category);
     }
-    function planItemHtml(x){
+    function planCardHtml(x){
       return `
-        <div class="item">
-          <div class="item-row">
+        <div class="plan-card ${x.status||"pending"}" data-plan-card="${x.id}">
+          <div class="plan-card-head">
             <div>
-              <b>${esc(x.title)}</b>
-              <div class="tiny">${esc(x.detail||"")}</div>
-              <span class="${planStatusClass(x.status)}">${planStatusLabel(x.status)}</span>
+              <span class="plan-category">${esc(categoryLabel[x.category]||"その他")}</span>
+              <b style="display:block">${esc(x.title)}</b>
+              <div class="plan-detail">${esc(x.detail||"")}</div>
             </div>
+            <span class="plan-state">${planStatusLabel(x.status)}</span>
           </div>
-          <textarea class="plan-memo" id="plan-memo-${x.id}" placeholder="メモ（重さ、回数、きつさ、できなかった理由など）">${esc(x.memo||"")}</textarea>
+          <textarea class="plan-memo" id="plan-memo-${x.id}" placeholder="メモ：重さ、回数、きつさ、できなかった理由など">${esc(x.memo||"")}</textarea>
           <div class="plan-actions">
             <button class="btn plan-status" type="button" data-id="${x.id}" data-status="done">やった</button>
             <button class="btn secondary plan-status" type="button" data-id="${x.id}" data-status="skipped">やってない</button>
-            <button class="btn secondary memo-only plan-memo-save" type="button" data-id="${x.id}">メモだけ保存</button>
           </div>
+          ${x.status!=="pending"?`<button class="plan-reset" type="button" data-id="${x.id}">未実施に戻す</button>`:""}
         </div>`;
+    }
+    function groupedPlanHtml(items){
+      if(!items.length)return '<p class="tiny">項目なし。</p>';
+      const groups=new Map();
+      for(const x of items){
+        const key=x.category||"other";
+        if(!groups.has(key))groups.set(key,[]);
+        groups.get(key).push(x);
+      }
+      return categoryOrder.filter(k=>groups.has(k)).map(k=>
+        '<div class="plan-section-label">'+esc(categoryLabel[k]||k)+'</div>'+
+        groups.get(k).map(planCardHtml).join("")
+      ).join("");
     }
     function bindPlanControls(root){
       root.querySelectorAll(".plan-status").forEach(btn=>btn.addEventListener("click",async()=>{
         const memo=root.querySelector("#plan-memo-"+CSS.escape(btn.dataset.id))?.value||"";
         await updatePlanItem(btn.dataset.id,btn.dataset.status,memo);
       }));
-      root.querySelectorAll(".plan-memo-save").forEach(btn=>btn.addEventListener("click",async()=>{
+      root.querySelectorAll(".plan-reset").forEach(btn=>btn.addEventListener("click",async()=>{
         const memo=root.querySelector("#plan-memo-"+CSS.escape(btn.dataset.id))?.value||"";
-        await updatePlanItem(btn.dataset.id,undefined,memo);
+        await updatePlanItem(btn.dataset.id,"pending",memo);
+      }));
+      root.querySelectorAll(".plan-memo").forEach(el=>el.addEventListener("change",async()=>{
+        await updatePlanItem(el.id.replace("plan-memo-",""),undefined,el.value,true);
       }));
     }
+    function updatePlanProgress(items){
+      const total=items.length;
+      const done=items.filter(x=>x.status==="done").length;
+      $("plan-progress-count").textContent=done+" / "+total;
+      $("plan-progress-bar").style.width=(total?done/total*100:0)+"%";
+    }
     function renderPlanViews(plan,items){
-      $("daily-plan-summary").textContent=(plan?.title||"今日のプラン")+(plan?.summary?" — "+plan.summary:"");
-      $("daily-plan-items").innerHTML=items.length?items.map(planItemHtml).join(""):'<p class="tiny">項目なし。</p>';
+      $("daily-plan-summary").textContent=plan?.summary||plan?.title||"今日のプラン";
+      $("daily-plan-items").innerHTML=groupedPlanHtml(items);
       bindPlanControls($("daily-plan-items"));
+      updatePlanProgress(items);
+
+      const foodItems=items.filter(x=>x.category==="food");
+      $("food-plan-summary").textContent=plan?.summary||"今日の食事";
+      $("food-plan-items").innerHTML=groupedPlanHtml(foodItems);
+      bindPlanControls($("food-plan-items"));
 
       const exerciseItems=items.filter(isExercisePlanItem);
       $("gym-plan-summary").textContent=plan?.summary||"今日の運動メニュー";
-      $("gym-plan-items").innerHTML=exerciseItems.length?exerciseItems.map(planItemHtml).join(""):'<p class="tiny">今日は運動・筋トレの指定なし。</p>';
+      $("gym-plan-items").innerHTML=groupedPlanHtml(exerciseItems);
       bindPlanControls($("gym-plan-items"));
     }
     async function planAccessToken(){
@@ -600,6 +672,8 @@
       if(!accessToken)return;
       $("daily-plan-summary").textContent="読み込み中…";
       $("daily-plan-items").innerHTML="";
+      $("food-plan-summary").textContent="読み込み中…";
+      $("food-plan-items").innerHTML="";
       $("gym-plan-summary").textContent="読み込み中…";
       $("gym-plan-items").innerHTML="";
       try{
@@ -609,21 +683,28 @@
         const body=await res.json().catch(()=>({}));
         if(!res.ok)throw new Error(body.error||"今日のプランを取得できませんでした");
         if(!body.plan){
-          $("daily-plan-summary").textContent="今日のプランはまだ登録されていません。";
-          $("daily-plan-items").innerHTML='<p class="tiny">ChatGPTが登録するとここに表示されます。</p>';
-          $("gym-plan-summary").textContent="今日の運動メニューはまだ登録されていません。";
-          $("gym-plan-items").innerHTML='<p class="tiny">ChatGPTが登録するとここに表示されます。</p>';
+          const empty='<p class="tiny">今日のプランはまだ登録されていません。</p>';
+          $("daily-plan-summary").textContent="ChatGPTのプラン待ち";
+          $("daily-plan-items").innerHTML=empty;
+          $("food-plan-summary").textContent="プラン待ち";
+          $("food-plan-items").innerHTML=empty;
+          $("gym-plan-summary").textContent="プラン待ち";
+          $("gym-plan-items").innerHTML=empty;
+          updatePlanProgress([]);
           return;
         }
         renderPlanViews(body.plan,body.items||[]);
       }catch(e){
+        const msg='<p class="warn">'+esc(e.message||e)+'</p>';
         $("daily-plan-summary").textContent="読み込みエラー";
-        $("daily-plan-items").innerHTML='<p class="warn">'+esc(e.message||e)+'</p>';
+        $("daily-plan-items").innerHTML=msg;
+        $("food-plan-summary").textContent="読み込みエラー";
+        $("food-plan-items").innerHTML=msg;
         $("gym-plan-summary").textContent="読み込みエラー";
-        $("gym-plan-items").innerHTML='<p class="warn">'+esc(e.message||e)+'</p>';
+        $("gym-plan-items").innerHTML=msg;
       }
     }
-    async function updatePlanItem(itemId,status,memo){
+    async function updatePlanItem(itemId,status,memo,silent=false){
       const accessToken=await planAccessToken();if(!accessToken)return;
       try{
         const payload={item_id:itemId,memo:memo||""};
@@ -635,8 +716,10 @@
         });
         const body=await res.json().catch(()=>({}));
         if(!res.ok)throw new Error(body.error||"更新できませんでした");
-        await loadDailyPlan();
-      }catch(e){alert("予定の更新に失敗しました。\n\n"+(e.message||e));}
+        if(!silent)await loadDailyPlan();
+      }catch(e){
+        if(!silent)alert("予定の更新に失敗しました。\n\n"+(e.message||e));
+      }
     }
     $("refresh-daily-plan").addEventListener("click",loadDailyPlan);
     $("refresh-gym-plan").addEventListener("click",loadDailyPlan);
@@ -1026,6 +1109,7 @@
     window.addEventListener("resize",()=>draw(S.get("progressLogs",[]).slice(-30)));
     if("serviceWorker" in navigator)window.addEventListener("load",async()=>{try{const r=await navigator.serviceWorker.register("./sw.js?v=5");await r.update();}catch(e){console.warn("Service Worker update failed",e);}});
 
+    $("today-date-label").textContent=new Intl.DateTimeFormat("ja-JP",{month:"long",day:"numeric",weekday:"short"}).format(new Date())+" — ChatGPTの提案をこなすだけ";
     normalizeLocalIds();renderGoalWeight();renderApiUrl();renderFood();renderProgress();getCloudSession();loadDailyPlan();
   })();
   </script>
