@@ -323,6 +323,21 @@
       </div>
       <div class="grid">
         <div class="card full">
+          <h2>Appleヘルスケア同期</h2>
+          <p class="tiny">iPhoneショートカットから歩数・睡眠・ワークアウト・消費カロリー・体重・心拍・栄養情報をSupabaseへ送れます。同期URL自体が書き込み用の鍵なので公開しないでください。</p>
+          <div class="cloud-row">
+            <button class="btn" type="button" id="create-health-url">同期URLを発行</button>
+            <button class="btn secondary" type="button" id="copy-health-url">URLをコピー</button>
+            <button class="btn danger" type="button" id="revoke-health-url">無効化</button>
+          </div>
+          <div id="health-url-wrap" style="display:none;margin-top:10px">
+            <div class="tiny">iPhoneショートカット用URL</div>
+            <div class="share-url" id="health-url"></div>
+          </div>
+          <div class="privacy-note" style="margin-top:10px">このURLはAppleヘルスケアの同期専用です。ショートカット側からPOSTされたデータだけを保存します。</div>
+        </div>
+
+        <div class="card full">
           <h2>ChatGPT API</h2>
           <p class="tiny">一度発行した読み取り専用URLから、ChatGPTがSupabaseの最新記録を取得できます。URL自体が鍵なので公開しないでください。</p>
           <div class="form" style="margin-top:10px">
@@ -425,6 +440,7 @@
     const SUPABASE_PUBLISHABLE_KEY="sb_publishable_kjjXKV3-gLiFKuLvTA9nUA_vnVAogFN";
     const DIET_API_FUNCTION=SUPABASE_URL+"/functions/v1/diet-data";
     const DAILY_PLAN_FUNCTION=SUPABASE_URL+"/functions/v1/daily-plan";
+    const HEALTH_SYNC_FUNCTION=SUPABASE_URL+"/functions/v1/health-sync";
     const sb=window.supabase?.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{
       auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}
     });
@@ -433,6 +449,7 @@
     let lastSharePath=null;
     let lastSignedUrl=null;
     let apiUrl=localStorage.getItem("dietOsApiUrl")||"";
+    let healthSyncUrl=localStorage.getItem("dietOsHealthSyncUrl")||"";
 
     function renderGoalWeight(){
       const goal=S.get("goalWeight",null);
@@ -820,6 +837,11 @@
       if(confirm("クラウド上の記録で、この端末の食事・進捗・筋トレ記録を置き換えますか？"))await pullCloudToLocal();
     });
 
+    function renderHealthSyncUrl(){
+      $("health-url").textContent=healthSyncUrl;
+      $("health-url-wrap").style.display=healthSyncUrl?"block":"none";
+    }
+
     function renderApiUrl(){
       $("api-url").textContent=apiUrl;
       $("api-url-wrap").style.display=apiUrl?"block":"none";
@@ -838,6 +860,45 @@
       const {data}=await sb.auth.getSession();
       return data.session?.access_token||null;
     }
+
+    $("create-health-url").addEventListener("click",async()=>{
+      const accessToken=await currentAccessToken();if(!accessToken)return;
+      try{
+        const res=await fetch(HEALTH_SYNC_FUNCTION+"?action=issue",{
+          method:"POST",
+          headers:{"Authorization":"Bearer "+accessToken}
+        });
+        const body=await res.json().catch(()=>({}));
+        if(!res.ok)throw new Error(body.error||"同期URLの発行に失敗しました");
+        healthSyncUrl=body.ingest_url||"";
+        localStorage.setItem("dietOsHealthSyncUrl",healthSyncUrl);
+        renderHealthSyncUrl();
+        try{await navigator.clipboard.writeText(healthSyncUrl);}catch(e){}
+        alert("Appleヘルスケア同期URLを発行しました。URLをコピーしてiPhoneショートカットに設定してください。");
+      }catch(e){alert("同期URLの発行に失敗しました。\n\n"+(e.message||e));}
+    });
+    $("copy-health-url").addEventListener("click",async()=>{
+      if(!healthSyncUrl){alert("先に同期URLを発行してください。");return;}
+      try{await navigator.clipboard.writeText(healthSyncUrl);alert("同期URLをコピーしました。");}
+      catch{alert("コピーできませんでした。URLを長押ししてコピーしてください。");}
+    });
+    $("revoke-health-url").addEventListener("click",async()=>{
+      if(!healthSyncUrl){alert("有効な同期URLはありません。");return;}
+      if(!confirm("Appleヘルスケア同期URLを無効化しますか？"))return;
+      const accessToken=await currentAccessToken();if(!accessToken)return;
+      try{
+        const res=await fetch(HEALTH_SYNC_FUNCTION,{
+          method:"DELETE",
+          headers:{"Authorization":"Bearer "+accessToken}
+        });
+        const body=await res.json().catch(()=>({}));
+        if(!res.ok)throw new Error(body.error||"無効化に失敗しました");
+        healthSyncUrl="";
+        localStorage.removeItem("dietOsHealthSyncUrl");
+        renderHealthSyncUrl();
+        alert("Appleヘルスケア同期URLを無効化しました。");
+      }catch(e){alert("無効化に失敗しました。\n\n"+(e.message||e));}
+    });
     $("create-api-url").addEventListener("click",async()=>{
       const scopes=selectedApiScopes();
       if(!Object.values(scopes).some(Boolean)){alert("取得項目を1つ以上選んでください。");return;}
@@ -1110,7 +1171,7 @@
     if("serviceWorker" in navigator)window.addEventListener("load",async()=>{try{const r=await navigator.serviceWorker.register("./sw.js?v=5");await r.update();}catch(e){console.warn("Service Worker update failed",e);}});
 
     $("today-date-label").textContent=new Intl.DateTimeFormat("ja-JP",{month:"long",day:"numeric",weekday:"short"}).format(new Date())+" — ChatGPTの提案をこなすだけ";
-    normalizeLocalIds();renderGoalWeight();renderApiUrl();renderFood();renderProgress();getCloudSession();loadDailyPlan();
+    normalizeLocalIds();renderGoalWeight();renderApiUrl();renderHealthSyncUrl();renderFood();renderProgress();getCloudSession();loadDailyPlan();
   })();
   </script>
 </body>
