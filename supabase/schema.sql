@@ -38,9 +38,24 @@ create table if not exists public.workout_logs (
   primary key (user_id, id)
 );
 
+create table if not exists public.user_preferences (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  gym_days text[] not null default array['tue','wed','fri']::text[],
+  move_goal_kcal integer not null default 500,
+  updated_at timestamptz not null default now(),
+  constraint user_preferences_gym_days_valid check (
+    cardinality(gym_days) between 1 and 7
+    and gym_days <@ array['mon','tue','wed','thu','fri','sat','sun']::text[]
+  ),
+  constraint user_preferences_move_goal_valid check (move_goal_kcal between 100 and 2000)
+);
+
 alter table public.daily_metrics enable row level security;
 alter table public.food_entries enable row level security;
 alter table public.workout_logs enable row level security;
+alter table public.user_preferences enable row level security;
+
+grant select, insert, update on table public.user_preferences to authenticated;
 
 drop policy if exists "own daily metrics" on public.daily_metrics;
 create policy "own daily metrics"
@@ -59,6 +74,16 @@ create policy "own workout logs"
 on public.workout_logs for all to authenticated
 using (auth.uid() = user_id)
 with check (auth.uid() = user_id);
+
+drop policy if exists "own user preferences" on public.user_preferences;
+create policy "own user preferences"
+on public.user_preferences for all to authenticated
+using ((select auth.uid()) = user_id)
+with check ((select auth.uid()) = user_id);
+
+insert into public.user_preferences (user_id)
+select id from auth.users
+on conflict (user_id) do nothing;
 
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values ('shared-reports', 'shared-reports', false, 1048576, array['application/json'])
