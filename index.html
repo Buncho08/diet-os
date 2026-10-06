@@ -79,6 +79,9 @@
     .privacy-note{padding:10px 12px;border:1px solid rgba(110,200,255,.28);border-radius:12px;background:rgba(110,200,255,.06);color:#cfeeff;font-size:.8rem}
     .cloud-row{display:flex;gap:8px;flex-wrap:wrap}
     .cloud-row .btn{flex:1 1 160px}
+    .weekday-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:10px}
+    .weekday-grid .todo{margin:0;align-items:center}
+    .schedule-summary{margin-top:10px}
     .cloud-status{display:flex;align-items:center;gap:8px;margin:8px 0 12px}
     .cloud-dot{width:9px;height:9px;border-radius:999px;background:#66727c;box-shadow:0 0 0 4px rgba(102,114,124,.12)}
     .cloud-dot.on{background:var(--green);box-shadow:0 0 0 4px rgba(166,239,109,.12)}
@@ -148,6 +151,7 @@
     @media(max-width:520px){
       .quick-grid{grid-template-columns:1fr 1fr}
       .hero-row{align-items:flex-start}
+      .weekday-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
     }
     @media(max-width:520px){
       .grid{grid-template-columns:1fr}.card{grid-column:1}.full{grid-column:1}
@@ -323,6 +327,25 @@
       </div>
       <div class="grid">
         <div class="card full">
+          <h2>週間スケジュール</h2>
+          <p class="tiny">ジムに行く曜日を設定します。選択していない曜日は休息日として扱い、ChatGPTの1日プランもこの設定を参照します。</p>
+          <div class="weekday-grid" id="gym-day-options">
+            <label class="todo"><input type="checkbox" class="gym-day-check" value="mon"><span>月</span></label>
+            <label class="todo"><input type="checkbox" class="gym-day-check" value="tue" checked><span>火</span></label>
+            <label class="todo"><input type="checkbox" class="gym-day-check" value="wed" checked><span>水</span></label>
+            <label class="todo"><input type="checkbox" class="gym-day-check" value="thu"><span>木</span></label>
+            <label class="todo"><input type="checkbox" class="gym-day-check" value="fri" checked><span>金</span></label>
+            <label class="todo"><input type="checkbox" class="gym-day-check" value="sat"><span>土</span></label>
+            <label class="todo"><input type="checkbox" class="gym-day-check" value="sun"><span>日</span></label>
+          </div>
+          <div class="form" style="margin-top:10px">
+            <label class="field"><span>ムーブゴール kcal</span><input id="move-goal-kcal" type="number" min="100" max="2000" step="10" value="500"></label>
+            <button class="btn" type="button" id="save-training-preferences">設定を保存</button>
+          </div>
+          <div class="privacy-note schedule-summary" id="training-schedule-summary">ジム：火・水・金 / 休息：月・木・土・日 / ムーブ：500 kcal</div>
+        </div>
+
+        <div class="card full">
           <h2>Appleヘルスケア同期</h2>
           <p class="tiny">iPhoneショートカットから歩数・睡眠・ワークアウト・消費カロリー・体重・心拍・栄養情報をSupabaseへ送れます。同期URL自体が書き込み用の鍵なので公開しないでください。</p>
           <div class="cloud-row">
@@ -450,6 +473,59 @@
     let lastSignedUrl=null;
     let apiUrl=localStorage.getItem("dietOsApiUrl")||"";
     let healthSyncUrl=localStorage.getItem("dietOsHealthSyncUrl")||"";
+    const DAY_ORDER=["mon","tue","wed","thu","fri","sat","sun"];
+    const DAY_LABELS={mon:"月",tue:"火",wed:"水",thu:"木",fri:"金",sat:"土",sun:"日"};
+    const DEFAULT_TRAINING_PREFERENCES={gym_days:["tue","wed","fri"],move_goal_kcal:500};
+
+    function normalizeTrainingPreferences(value){
+      const raw=value&&typeof value==="object"?value:{};
+      const gymDays=Array.isArray(raw.gym_days)?DAY_ORDER.filter(day=>raw.gym_days.includes(day)):DEFAULT_TRAINING_PREFERENCES.gym_days.slice();
+      const move=Number(raw.move_goal_kcal);
+      return {
+        gym_days:gymDays.length?gymDays:DEFAULT_TRAINING_PREFERENCES.gym_days.slice(),
+        move_goal_kcal:Number.isFinite(move)?clamp(Math.round(move),100,2000):DEFAULT_TRAINING_PREFERENCES.move_goal_kcal
+      };
+    }
+    function getLocalTrainingPreferences(){
+      return normalizeTrainingPreferences(S.get("trainingPreferences",DEFAULT_TRAINING_PREFERENCES));
+    }
+    function renderTrainingPreferences(value){
+      const prefs=normalizeTrainingPreferences(value);
+      document.querySelectorAll(".gym-day-check").forEach(el=>{el.checked=prefs.gym_days.includes(el.value);});
+      if($("move-goal-kcal"))$("move-goal-kcal").value=prefs.move_goal_kcal;
+      const restDays=DAY_ORDER.filter(day=>!prefs.gym_days.includes(day));
+      if($("training-schedule-summary"))$("training-schedule-summary").textContent=
+        "ジム："+prefs.gym_days.map(day=>DAY_LABELS[day]).join("・")+" / 休息："+restDays.map(day=>DAY_LABELS[day]).join("・")+" / ムーブ："+prefs.move_goal_kcal+" kcal";
+    }
+    async function loadTrainingPreferences(){
+      const local=getLocalTrainingPreferences();
+      renderTrainingPreferences(local);
+      const user=await getCloudSession();
+      if(!user)return local;
+      const {data,error}=await sb.from("user_preferences").select("gym_days,move_goal_kcal").eq("user_id",user.id).maybeSingle();
+      if(error){console.warn("training preferences load failed",error);return local;}
+      const prefs=normalizeTrainingPreferences(data||local);
+      S.set("trainingPreferences",prefs);
+      renderTrainingPreferences(prefs);
+      return prefs;
+    }
+    async function saveTrainingPreferences(){
+      const gymDays=DAY_ORDER.filter(day=>document.querySelector('.gym-day-check[value="'+day+'"]')?.checked);
+      if(!gymDays.length){alert("ジム日は1日以上選んでください。");return;}
+      const prefs=normalizeTrainingPreferences({gym_days:gymDays,move_goal_kcal:Number($("move-goal-kcal").value)});
+      const user=await connectCloud();
+      if(!user)return;
+      const {error}=await sb.from("user_preferences").upsert({
+        user_id:user.id,
+        gym_days:prefs.gym_days,
+        move_goal_kcal:prefs.move_goal_kcal,
+        updated_at:new Date().toISOString()
+      },{onConflict:"user_id"});
+      if(error){alert("週間スケジュールの保存に失敗しました。\n\n"+error.message);return;}
+      S.set("trainingPreferences",prefs);
+      renderTrainingPreferences(prefs);
+      alert("週間スケジュールを保存しました。");
+    }
 
     function renderGoalWeight(){
       const goal=S.get("goalWeight",null);
@@ -740,6 +816,7 @@
     }
     $("refresh-daily-plan").addEventListener("click",loadDailyPlan);
     $("refresh-gym-plan").addEventListener("click",loadDailyPlan);
+    $("save-training-preferences").addEventListener("click",saveTrainingPreferences);
 
     function renderFood(){
       const n=nutrition();
@@ -1171,7 +1248,7 @@
     if("serviceWorker" in navigator)window.addEventListener("load",async()=>{try{const r=await navigator.serviceWorker.register("./sw.js?v=5");await r.update();}catch(e){console.warn("Service Worker update failed",e);}});
 
     $("today-date-label").textContent=new Intl.DateTimeFormat("ja-JP",{month:"long",day:"numeric",weekday:"short"}).format(new Date())+" — ChatGPTの提案をこなすだけ";
-    normalizeLocalIds();renderGoalWeight();renderApiUrl();renderHealthSyncUrl();renderFood();renderProgress();getCloudSession();loadDailyPlan();
+    normalizeLocalIds();renderGoalWeight();renderApiUrl();renderHealthSyncUrl();renderTrainingPreferences(getLocalTrainingPreferences());renderFood();renderProgress();getCloudSession().then(loadTrainingPreferences);loadDailyPlan();
   })();
   </script>
 </body>
