@@ -12,8 +12,8 @@
   <title>Diet OS</title>
   <style>
     :root{
-      --bg:#090c0f;--surface:#12171c;--surface2:#181f26;--line:#28333d;
-      --text:#f4f7f9;--muted:#97a3ae;--green:#a6ef6d;--blue:#6ec8ff;
+      --bg:#080a0c;--surface:#11161b;--surface2:#171e24;--line:#34414b;
+      --text:#f7f9fa;--muted:#aeb8c1;--green:#b5f47d;--blue:#79d0ff;
       --yellow:#ffd166;--red:#ff7b7b;--safe-bottom:env(safe-area-inset-bottom,0px);
     }
     *{box-sizing:border-box}
@@ -30,7 +30,7 @@
     button,input,select{font:inherit}
     button,label{touch-action:manipulation}
     .tab-radio{position:fixed;opacity:0;pointer-events:none}
-    .app{width:min(760px,100%);margin:0 auto;padding:0 14px calc(96px + var(--safe-bottom))}
+    .app{width:min(820px,100%);margin:0 auto;padding:0 14px calc(96px + var(--safe-bottom))}
     header{
       position:sticky;top:0;z-index:20;margin:0 -14px;padding:12px 14px 10px;
       background:rgba(9,12,15,.82);-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);
@@ -46,17 +46,17 @@
     #tab-progress:checked~.app #progress,
     #tab-ai:checked~.app #ai{display:block}
     .hero{
-      padding:22px;border:1px solid var(--line);border-radius:24px;
-      background:linear-gradient(145deg,#161d24,#101419);box-shadow:0 20px 55px rgba(0,0,0,.22)
+      padding:20px;border:1px solid var(--line);border-radius:20px;
+      background:#11171c;box-shadow:0 14px 36px rgba(0,0,0,.18)
     }
     .eyebrow{font-size:.72rem;font-weight:900;letter-spacing:.16em;color:var(--green)}
-    h1{font-size:clamp(2.2rem,10vw,4.6rem);line-height:.96;margin:.35rem 0 .55rem}
+    h1{font-size:clamp(2rem,8vw,3.5rem);line-height:1;margin:.35rem 0 .55rem;letter-spacing:-.045em}
     h2{font-size:1.04rem;margin:0 0 12px}
     p{margin:.4rem 0}
     .muted{color:var(--muted)}
     .tiny{font-size:.76rem;color:var(--muted)}
     .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
-    .card{padding:16px;border:1px solid var(--line);border-radius:18px;background:var(--surface)}
+    .card{padding:17px;border:1px solid var(--line);border-radius:16px;background:var(--surface)}
     .full{grid-column:1/-1}
     .metric{font-size:1.8rem;font-weight:900;letter-spacing:-.03em}
     .metric small{font-size:.76rem;font-weight:600;color:var(--muted)}
@@ -82,6 +82,17 @@
     .weekday-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:10px}
     .weekday-grid .todo{margin:0;align-items:center}
     .schedule-summary{margin-top:10px}
+    .today-meta-row{display:flex;flex-wrap:wrap;gap:7px;margin-top:12px}
+    .meta-chip{display:inline-flex;align-items:center;gap:5px;min-height:30px;padding:5px 9px;border:1px solid var(--line);border-radius:999px;background:#0d1216;color:var(--muted);font-size:.74rem;font-weight:750}
+    .meta-chip strong{color:var(--text)}
+    .meta-chip.primary{border-color:rgba(181,244,125,.4);background:rgba(181,244,125,.08);color:var(--green)}
+    .plan-title-main{font-size:1.25rem;font-weight:900;letter-spacing:-.02em;margin:2px 0 5px}
+    .plan-meta{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+    .source-badge{display:inline-flex;align-items:center;padding:4px 8px;border-radius:999px;background:rgba(121,208,255,.09);border:1px solid rgba(121,208,255,.3);font-size:.7rem;color:#d7f2ff;font-weight:800}
+    .readonly-note{margin-top:9px;padding:8px 10px;border-radius:10px;border:1px solid rgba(255,209,102,.32);background:rgba(255,209,102,.06);font-size:.74rem;color:#ffe6a1}
+    .plan-note{margin-top:9px;border-top:1px solid rgba(52,65,75,.7);padding-top:8px}
+    .plan-note summary{cursor:pointer;color:var(--muted);font-size:.72rem;font-weight:800;user-select:none}
+    .plan-note .plan-memo{margin-top:8px}
     .cloud-status{display:flex;align-items:center;gap:8px;margin:8px 0 12px}
     .cloud-dot{width:9px;height:9px;border-radius:999px;background:#66727c;box-shadow:0 0 0 4px rgba(102,114,124,.12)}
     .cloud-dot.on{background:var(--green);box-shadow:0 0 0 4px rgba(166,239,109,.12)}
@@ -131,19 +142,19 @@
     .quick-stat{padding:12px;border:1px solid var(--line);border-radius:14px;background:var(--surface)}
     .quick-stat b{display:block;font-size:1.18rem;margin-top:3px}
     .quick-stat span{font-size:.68rem;color:var(--muted)}
-    .plan-section-label{margin:14px 0 7px;font-size:.72rem;letter-spacing:.08em;color:var(--muted);font-weight:800}
-    .plan-card{padding:13px;border:1px solid var(--line);border-radius:14px;background:var(--surface2)}
+    .plan-section-label{margin:18px 0 8px;font-size:.78rem;letter-spacing:.06em;color:#dce3e8;font-weight:900}
+    .plan-card{padding:14px;border:1px solid var(--line);border-radius:14px;background:var(--surface2);margin-bottom:8px}
     .plan-card.done{border-color:rgba(166,239,109,.38);background:rgba(166,239,109,.055)}
     .plan-card.skipped{border-color:rgba(255,123,123,.38);background:rgba(255,123,123,.045)}
     .plan-card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
-    .plan-category{display:inline-block;margin-bottom:5px;font-size:.66rem;font-weight:900;letter-spacing:.08em;color:var(--green)}
-    .plan-detail{margin-top:4px;font-size:.78rem;color:var(--muted);line-height:1.45}
+    .plan-category{display:inline-block;margin-bottom:6px;font-size:.68rem;font-weight:900;letter-spacing:.08em;color:var(--green)}
+    .plan-detail{margin-top:6px;font-size:.84rem;color:#c2cbd2;line-height:1.55}
     .plan-state{white-space:nowrap;font-size:.68rem;padding:4px 7px;border:1px solid var(--line);border-radius:999px;color:var(--muted)}
     .plan-card.done .plan-state{color:var(--green);border-color:rgba(166,239,109,.35)}
     .plan-card.skipped .plan-state{color:var(--red);border-color:rgba(255,123,123,.35)}
     .plan-memo{min-height:40px!important;resize:vertical}
     .plan-actions{grid-template-columns:1fr 1fr}
-    .plan-actions .btn{min-height:40px;padding:8px 10px}
+    .plan-actions .btn{min-height:44px;padding:9px 10px}
     .plan-reset{margin-top:7px;border:0;background:transparent;color:var(--muted);font-size:.7rem;padding:4px 0}
     .subtle-card{background:transparent;border-style:dashed}
     details.advanced{border:1px solid var(--line);border-radius:14px;background:var(--surface);padding:13px}
@@ -176,6 +187,11 @@
             <div class="eyebrow">TODAY</div>
             <h1>今日これだけ。</h1>
             <p class="muted" id="today-date-label">ChatGPTが今日のプランを決めます。</p>
+            <div class="today-meta-row">
+              <span class="meta-chip primary" id="today-mode-badge">予定を確認中</span>
+              <span class="meta-chip">MOVE <strong><span id="today-move-goal">500</span> kcal</strong></span>
+              <span class="meta-chip" id="today-plan-source">プラン待ち</span>
+            </div>
           </div>
           <div class="hero-progress">
             <strong id="plan-progress-count">-- / --</strong>
@@ -189,8 +205,11 @@
         <div class="card full">
           <div class="status">
             <div>
-              <h2 style="margin-bottom:3px">今日のプラン</h2>
-              <div id="daily-plan-summary" class="tiny">読み込み中…</div>
+              <h2 style="margin-bottom:5px">今日のプラン</h2>
+              <div id="daily-plan-title" class="plan-title-main">読み込み中…</div>
+              <div id="daily-plan-summary" class="tiny">自動登録された内容を取得しています。</div>
+              <div id="daily-plan-meta" class="plan-meta"></div>
+              <div id="daily-plan-readonly" class="readonly-note" style="display:none">別セッションのデータを表示しています。この端末からの完了更新はできません。</div>
             </div>
             <button class="btn secondary" type="button" id="refresh-daily-plan" style="width:auto;min-height:36px;padding:6px 10px">更新</button>
           </div>
@@ -327,8 +346,8 @@
       </div>
       <div class="grid">
         <div class="card full">
-          <h2>週間スケジュール</h2>
-          <p class="tiny">ジムに行く曜日を設定します。選択していない曜日は休息日として扱い、ChatGPTの1日プランもこの設定を参照します。</p>
+          <h2>自動プランの週間設定</h2>
+          <p class="tiny">ここで設定したジム曜日とムーブ目標を、毎朝のChatGPT自動プランが参照します。未選択の曜日は休息日です。</p>
           <div class="weekday-grid" id="gym-day-options">
             <label class="todo"><input type="checkbox" class="gym-day-check" value="mon"><span>月</span></label>
             <label class="todo"><input type="checkbox" class="gym-day-check" value="tue" checked><span>火</span></label>
@@ -473,6 +492,7 @@
     let lastSignedUrl=null;
     let apiUrl=localStorage.getItem("dietOsApiUrl")||"";
     let healthSyncUrl=localStorage.getItem("dietOsHealthSyncUrl")||"";
+    let currentPlanReadOnly=false;
     const DAY_ORDER=["mon","tue","wed","thu","fri","sat","sun"];
     const DAY_LABELS={mon:"月",tue:"火",wed:"水",thu:"木",fri:"金",sat:"土",sun:"日"};
     const DEFAULT_TRAINING_PREFERENCES={gym_days:["tue","wed","fri"],move_goal_kcal:500};
@@ -496,6 +516,13 @@
       const restDays=DAY_ORDER.filter(day=>!prefs.gym_days.includes(day));
       if($("training-schedule-summary"))$("training-schedule-summary").textContent=
         "ジム："+prefs.gym_days.map(day=>DAY_LABELS[day]).join("・")+" / 休息："+restDays.map(day=>DAY_LABELS[day]).join("・")+" / ムーブ："+prefs.move_goal_kcal+" kcal";
+      if($("today-move-goal"))$("today-move-goal").textContent=prefs.move_goal_kcal;
+      const jsDay=["sun","mon","tue","wed","thu","fri","sat"][new Date().getDay()];
+      if($("today-mode-badge")){
+        const isGym=prefs.gym_days.includes(jsDay);
+        $("today-mode-badge").textContent=isGym?"今日はジム日":"今日は休息日";
+        $("today-mode-badge").classList.toggle("primary",isGym);
+      }
     }
     async function loadTrainingPreferences(){
       const local=getLocalTrainingPreferences();
@@ -689,22 +716,26 @@
       return ["strength","cardio","recovery"].includes(x.category);
     }
     function planCardHtml(x){
+      const disabled=currentPlanReadOnly?" disabled":"";
       return `
         <div class="plan-card ${x.status||"pending"}" data-plan-card="${x.id}">
           <div class="plan-card-head">
             <div>
               <span class="plan-category">${esc(categoryLabel[x.category]||"その他")}</span>
-              <b style="display:block">${esc(x.title)}</b>
+              <b style="display:block;font-size:1rem;line-height:1.35">${esc(x.title)}</b>
               <div class="plan-detail">${esc(x.detail||"")}</div>
             </div>
             <span class="plan-state">${planStatusLabel(x.status)}</span>
           </div>
-          <textarea class="plan-memo" id="plan-memo-${x.id}" placeholder="メモ：重さ、回数、きつさ、できなかった理由など">${esc(x.memo||"")}</textarea>
           <div class="plan-actions">
-            <button class="btn plan-status" type="button" data-id="${x.id}" data-status="done">やった</button>
-            <button class="btn secondary plan-status" type="button" data-id="${x.id}" data-status="skipped">やってない</button>
+            <button class="btn plan-status" type="button" data-id="${x.id}" data-status="done"${disabled}>やった</button>
+            <button class="btn secondary plan-status" type="button" data-id="${x.id}" data-status="skipped"${disabled}>やってない</button>
           </div>
-          ${x.status!=="pending"?`<button class="plan-reset" type="button" data-id="${x.id}">未実施に戻す</button>`:""}
+          <details class="plan-note">
+            <summary>メモを追加・確認</summary>
+            <textarea class="plan-memo" id="plan-memo-${x.id}" placeholder="重さ、回数、きつさ、できなかった理由など"${disabled}>${esc(x.memo||"")}</textarea>
+            ${x.status!=="pending"&&!currentPlanReadOnly?`<button class="plan-reset" type="button" data-id="${x.id}">未実施に戻す</button>`:""}
+          </details>
         </div>`;
     }
     function groupedPlanHtml(items){
@@ -739,8 +770,14 @@
       $("plan-progress-count").textContent=done+" / "+total;
       $("plan-progress-bar").style.width=(total?done/total*100:0)+"%";
     }
-    function renderPlanViews(plan,items){
-      $("daily-plan-summary").textContent=plan?.summary||plan?.title||"今日のプラン";
+    function renderPlanViews(plan,items,meta={}){
+      $("daily-plan-title").textContent=plan?.title||"今日のプラン";
+      $("daily-plan-summary").textContent=plan?.summary||"登録済みのプランです。";
+      const source=plan?.generated_by==="chatgpt"?"ChatGPT自動登録":"登録済み";
+      const time=formatPlanTime(plan?.updated_at);
+      $("daily-plan-meta").innerHTML='<span class="source-badge">'+esc(source)+'</span>'+(time?'<span class="source-badge">'+esc(time)+' 更新</span>':"")+'<span class="source-badge">'+items.length+'項目</span>';
+      $("today-plan-source").textContent=source+(time?" "+time:"");
+      $("daily-plan-readonly").style.display=currentPlanReadOnly?"":"none";
       $("daily-plan-items").innerHTML=groupedPlanHtml(items);
       bindPlanControls($("daily-plan-items"));
       updatePlanProgress(items);
@@ -755,29 +792,56 @@
       $("gym-plan-items").innerHTML=groupedPlanHtml(exerciseItems);
       bindPlanControls($("gym-plan-items"));
     }
+    function dietApiToken(){
+      try{
+        if(!apiUrl)return "";
+        return new URL(apiUrl).searchParams.get("token")||"";
+      }catch{return "";}
+    }
     async function planAccessToken(){
       const user=await connectCloud();if(!user)return null;
       const {data}=await sb.auth.getSession();
       return data.session?.access_token||null;
     }
+    function formatPlanTime(value){
+      if(!value)return "";
+      const d=new Date(value);
+      if(Number.isNaN(d.getTime()))return "";
+      return new Intl.DateTimeFormat("ja-JP",{hour:"2-digit",minute:"2-digit"}).format(d);
+    }
     async function loadDailyPlan(){
       const accessToken=await planAccessToken();
-      if(!accessToken)return;
-      $("daily-plan-summary").textContent="読み込み中…";
+      const readToken=dietApiToken();
+      if(!accessToken&&!readToken)return;
+      $("daily-plan-title").textContent="読み込み中…";
+      $("daily-plan-summary").textContent="自動登録された内容を取得しています。";
+      $("daily-plan-meta").innerHTML="";
       $("daily-plan-items").innerHTML="";
       $("food-plan-summary").textContent="読み込み中…";
       $("food-plan-items").innerHTML="";
       $("gym-plan-summary").textContent="読み込み中…";
       $("gym-plan-items").innerHTML="";
       try{
-        const res=await fetch(DAILY_PLAN_FUNCTION+"?date="+encodeURIComponent(S.date()),{
-          headers:{"Authorization":"Bearer "+accessToken}
-        });
+        const url=new URL(DAILY_PLAN_FUNCTION);
+        url.searchParams.set("date",S.date());
+        if(readToken)url.searchParams.set("token",readToken);
+        const headers=accessToken?{"Authorization":"Bearer "+accessToken}:{};
+        const res=await fetch(url.toString(),{headers});
         const body=await res.json().catch(()=>({}));
         if(!res.ok)throw new Error(body.error||"今日のプランを取得できませんでした");
+        currentPlanReadOnly=body.read_only===true;
+        if(body.preferences){
+          const prefs=normalizeTrainingPreferences(body.preferences);
+          S.set("trainingPreferences",prefs);
+          renderTrainingPreferences(prefs);
+        }
         if(!body.plan){
           const empty='<p class="tiny">今日のプランはまだ登録されていません。</p>';
-          $("daily-plan-summary").textContent="ChatGPTのプラン待ち";
+          $("daily-plan-title").textContent="プラン待ち";
+          $("daily-plan-summary").textContent="自動タスクの登録待ちです。";
+          $("daily-plan-meta").innerHTML="";
+          $("today-plan-source").textContent="プラン待ち";
+          $("daily-plan-readonly").style.display="none";
           $("daily-plan-items").innerHTML=empty;
           $("food-plan-summary").textContent="プラン待ち";
           $("food-plan-items").innerHTML=empty;
@@ -786,10 +850,12 @@
           updatePlanProgress([]);
           return;
         }
-        renderPlanViews(body.plan,body.items||[]);
+        renderPlanViews(body.plan,body.items||[],body);
       }catch(e){
         const msg='<p class="warn">'+esc(e.message||e)+'</p>';
-        $("daily-plan-summary").textContent="読み込みエラー";
+        $("daily-plan-title").textContent="読み込みエラー";
+        $("daily-plan-summary").textContent="Supabaseとの同期に失敗しました。";
+        $("today-plan-source").textContent="同期エラー";
         $("daily-plan-items").innerHTML=msg;
         $("food-plan-summary").textContent="読み込みエラー";
         $("food-plan-items").innerHTML=msg;
