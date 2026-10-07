@@ -585,11 +585,10 @@
       if($("training-schedule-summary"))$("training-schedule-summary").textContent=
         "ジム："+prefs.gym_days.map(day=>DAY_LABELS[day]).join("・")+" / 休息："+restDays.map(day=>DAY_LABELS[day]).join("・")+" / ムーブ："+prefs.move_goal_kcal+" kcal";
       if($("today-move-goal"))$("today-move-goal").textContent=prefs.move_goal_kcal;
-      const jsDay=["sun","mon","tue","wed","thu","fri","sat"][new Date().getDay()];
-      if($("today-mode-badge")){
-        const isGym=prefs.gym_days.includes(jsDay);
-        $("today-mode-badge").textContent=isGym?"今日はジム日":"今日は休息日";
-        $("today-mode-badge").classList.toggle("primary",isGym);
+      // Preferences are scheduling hints, never the source of today's workout decision.
+      // The badge is updated from the actual ChatGPT plan when it loads.
+      if($("today-mode-badge") && $("today-mode-badge").textContent==="予定を確認中"){
+        $("today-mode-badge").textContent="プラン確認中";
       }
     }
     async function loadTrainingPreferences(){
@@ -846,6 +845,10 @@
       $("daily-plan-title").textContent=plan?.title||"今日のプラン";
       $("daily-plan-summary").textContent=plan?.summary||"登録済みのプランです。";
       const source=plan?.generated_by==="chatgpt"?"ChatGPT自動登録":"登録済み";
+      const hasStrength=items.some(item=>item.category==="strength");
+      const hasCardio=items.some(item=>item.category==="cardio");
+      $("today-mode-badge").textContent=hasStrength?"筋トレメニュー":hasCardio?"有酸素・活動メニュー":"休養・生活習慣";
+      $("today-mode-badge").classList.toggle("primary",hasStrength);
       const time=formatPlanTime(plan?.updated_at);
       $("daily-plan-meta").innerHTML='<span class="source-badge">'+esc(source)+'</span>'+(time?'<span class="source-badge">'+esc(time)+' 更新</span>':"")+'<span class="source-badge">'+items.length+'項目</span>';
       $("today-plan-source").textContent=source+(time?" "+time:"");
@@ -909,7 +912,8 @@
         }
         if(!body.plan){
           const empty='<p class="tiny">今日のプランはまだ登録されていません。</p>';
-          $("daily-plan-title").textContent="プラン待ち";
+          $("today-mode-badge").textContent="プラン待ち";
+        $("daily-plan-title").textContent="プラン待ち";
           $("daily-plan-summary").textContent="自動タスクの登録待ちです。";
           $("daily-plan-meta").innerHTML="";
           $("today-plan-source").textContent="プラン待ち";
@@ -925,6 +929,7 @@
         renderPlanViews(body.plan,body.items||[],body);
       }catch(e){
         const msg='<p class="warn">'+esc(e.message||e)+'</p>';
+        $("today-mode-badge").textContent="プラン確認エラー";
         $("daily-plan-title").textContent="読み込みエラー";
         $("daily-plan-summary").textContent="Supabaseとの同期に失敗しました。";
         $("today-plan-source").textContent="同期エラー";
