@@ -537,6 +537,10 @@
       return prefs;
     }
     async function saveTrainingPreferences(){
+      if(currentPlanReadOnly){
+        alert("この端末は別の匿名セッションになっているため、現在は設定を閲覧のみできます。今日の自動プランは表示できます。");
+        return;
+      }
       const gymDays=DAY_ORDER.filter(day=>document.querySelector('.gym-day-check[value="'+day+'"]')?.checked);
       if(!gymDays.length){alert("ジム日は1日以上選んでください。");return;}
       const prefs=normalizeTrainingPreferences({gym_days:gymDays,move_goal_kcal:Number($("move-goal-kcal").value)});
@@ -1314,7 +1318,7 @@
     if("serviceWorker" in navigator)window.addEventListener("load",async()=>{try{const r=await navigator.serviceWorker.register("./sw.js?v=5");await r.update();}catch(e){console.warn("Service Worker update failed",e);}});
 
     $("today-date-label").textContent=new Intl.DateTimeFormat("ja-JP",{month:"long",day:"numeric",weekday:"short"}).format(new Date())+" — ChatGPTの提案をこなすだけ";
-    normalizeLocalIds();renderGoalWeight();renderApiUrl();renderHealthSyncUrl();renderTrainingPreferences(getLocalTrainingPreferences());renderFood();renderProgress();getCloudSession().then(loadTrainingPreferences);loadDailyPlan();
+    normalizeLocalIds();renderGoalWeight();renderApiUrl();renderHealthSyncUrl();renderTrainingPreferences(getLocalTrainingPreferences());renderFood();renderProgress();getCloudSession();loadDailyPlan();
   })();
   </script>
 </body>
