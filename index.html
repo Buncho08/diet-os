@@ -43,6 +43,7 @@
     #tab-home:checked~.app #home,
     #tab-food:checked~.app #food,
     #tab-gym:checked~.app #gym,
+    #tab-history:checked~.app #history-page,
     #tab-progress:checked~.app #progress,
     #tab-ai:checked~.app #ai{display:block}
     .hero{
@@ -118,7 +119,7 @@
       padding:8px 10px calc(8px + var(--safe-bottom));background:rgba(11,15,19,.96);
       -webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);border-top:1px solid var(--line)
     }
-    .bottom-inner{width:min(760px,100%);margin:auto;display:grid;grid-template-columns:repeat(5,1fr);gap:5px}
+    .bottom-inner{width:min(760px,100%);margin:auto;display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:4px}
     .nav-label{
       min-height:55px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
       border-radius:13px;color:var(--muted);user-select:none;-webkit-user-select:none;cursor:pointer;font-size:.74rem;font-weight:700
@@ -127,6 +128,7 @@
     #tab-home:checked~.bottom-nav label[for=tab-home],
     #tab-food:checked~.bottom-nav label[for=tab-food],
     #tab-gym:checked~.bottom-nav label[for=tab-gym],
+    #tab-history:checked~.bottom-nav label[for=tab-history],
     #tab-progress:checked~.bottom-nav label[for=tab-progress],
     #tab-ai:checked~.bottom-nav label[for=tab-ai]{background:var(--surface2);color:var(--green)}
     .status{display:flex;justify-content:space-between;gap:12px;align-items:center}
@@ -168,12 +170,30 @@
       .grid{grid-template-columns:1fr}.card{grid-column:1}.full{grid-column:1}
       .exercise-inputs{grid-template-columns:1fr 1fr}.exercise-inputs label:first-child{grid-column:1/-1}
     }
+
+    /* Read-only daily history */
+    #history-page .history-toolbar{display:flex;gap:8px;align-items:end;flex-wrap:wrap}
+    #history-page .history-toolbar .field{flex:1 1 135px}
+    #history-page .history-toolbar .btn{flex:0 0 auto;width:auto;min-width:72px}
+    #history-page .history-recent{display:flex;gap:7px;overflow-x:auto;padding:9px 0 2px;scrollbar-width:thin}
+    #history-page .history-chip{flex:0 0 auto;min-height:36px;padding:7px 10px;border:1px solid var(--line);background:var(--surface2);color:var(--text);border-radius:12px;font-size:.77rem;font-weight:800}
+    #history-page .history-chip.selected{border-color:var(--green);color:var(--green)}
+    #history-page .history-entry{padding:11px 12px;border:1px solid var(--line);border-radius:12px;background:var(--surface2);margin:7px 0}
+    #history-page .history-entry.done{border-color:rgba(181,244,125,.38)}
+    #history-page .history-entry.skipped{border-color:rgba(255,123,123,.35)}
+    #history-page .history-subheading{font-size:.81rem;color:var(--green);margin:14px 0 7px}
+    #history-page .history-memo{font-size:.75rem;color:var(--muted);padding-top:6px;white-space:pre-wrap;overflow-wrap:anywhere}
+    #history-page .history-score{margin:10px 0 4px;font-size:.81rem;font-weight:800}
+    #history-page .history-stat .metric{font-size:1.45rem}
+    .nav-label{font-size:.69rem}
+    @media(max-width:390px){.nav-label{font-size:.65rem;min-height:51px}}
   </style>
 </head>
 <body>
   <input class="tab-radio" type="radio" name="tabs" id="tab-home" checked>
   <input class="tab-radio" type="radio" name="tabs" id="tab-food">
   <input class="tab-radio" type="radio" name="tabs" id="tab-gym">
+  <input class="tab-radio" type="radio" name="tabs" id="tab-history">
   <input class="tab-radio" type="radio" name="tabs" id="tab-progress">
   <input class="tab-radio" type="radio" name="tabs" id="tab-ai">
 
@@ -452,6 +472,53 @@
         </div>
       </div>
     </section>
+
+    <section class="page" id="history-page">
+      <div class="hero">
+        <div class="eyebrow">HISTORY</div>
+        <h1>これまでの記録。</h1>
+        <p class="muted">昨日以前の食事・運動・健康データと、プラン達成状況を確認できます。</p>
+        <p class="tiny">過去の日付は閲覧専用です。記録の編集は「食事」「運動」「記録」から行ってください。</p>
+      </div>
+      <div class="grid">
+        <div class="card full">
+          <h2>日付を選択</h2>
+          <div class="history-toolbar">
+            <button class="btn secondary" type="button" id="history-previous" aria-label="前の日">← 前日</button>
+            <label class="field"><span>表示する日（昨日まで）</span><input type="date" id="history-date" aria-label="履歴の日付"></label>
+            <button class="btn secondary" type="button" id="history-next" aria-label="次の日">翌日 →</button>
+          </div>
+          <div class="history-recent" id="history-recent" aria-label="最近7日間"></div>
+          <div class="cloud-row" style="margin-top:11px">
+            <button class="btn secondary" type="button" id="history-yesterday">昨日へ戻る</button>
+            <button class="btn secondary" type="button" id="history-refresh">再読み込み</button>
+          </div>
+          <div class="status" style="margin-top:14px">
+            <b id="history-current-date">—</b><span class="source-badge" id="history-source">未取得</span>
+          </div>
+          <p class="tiny" id="history-status" role="status" style="margin-top:8px">日付を選択すると記録が表示されます。</p>
+        </div>
+        <div class="card full">
+          <h2>この日の記録</h2>
+          <div class="quick-grid">
+            <div class="quick-stat history-stat"><span>摂取</span><b class="metric"><span id="history-kcal">—</span> <small>kcal</small></b></div>
+            <div class="quick-stat history-stat"><span>たんぱく質</span><b class="metric"><span id="history-protein">—</span> <small>g</small></b></div>
+            <div class="quick-stat history-stat"><span>歩数</span><b class="metric" id="history-steps">—</b></div>
+            <div class="quick-stat history-stat"><span>睡眠</span><b class="metric"><span id="history-sleep">—</span> <small>h</small></b></div>
+          </div>
+          <p class="tiny" style="margin-top:12px">体重：<strong id="history-weight">—</strong> kg（未入力は「—」）</p>
+        </div>
+        <div class="card full">
+          <h2>当日のプランと達成状況</h2>
+          <div class="plan-title-main" id="history-plan-title">未取得</div>
+          <p class="tiny" id="history-plan-summary"></p>
+          <div class="history-score" id="history-plan-score"></div>
+          <div id="history-plan-items"></div>
+        </div>
+        <div class="card full"><h2>食事の記録</h2><div id="history-food-list"></div></div>
+        <div class="card full"><h2>筋トレ・ワークアウトの記録</h2><div id="history-workout-list"></div></div>
+      </div>
+    </section>
   </main>
 
   <nav class="bottom-nav" aria-label="メインナビゲーション">
@@ -459,6 +526,7 @@
       <label class="nav-label" for="tab-home"><strong>●</strong>今日</label>
       <label class="nav-label" for="tab-food"><strong>□</strong>食事</label>
       <label class="nav-label" for="tab-gym"><strong>▲</strong>運動</label>
+      <label class="nav-label" for="tab-history"><strong>▤</strong>履歴</label>
       <label class="nav-label" for="tab-progress"><strong>↗</strong>記録</label>
       <label class="nav-label" for="tab-ai"><strong>⚙</strong>設定</label>
     </div>
@@ -1321,5 +1389,6 @@
     normalizeLocalIds();renderGoalWeight();renderApiUrl();renderHealthSyncUrl();renderTrainingPreferences(getLocalTrainingPreferences());renderFood();renderProgress();getCloudSession();loadDailyPlan();
   })();
   </script>
+  <script src="./history.js?v=1" defer></script>
 </body>
 </html>
