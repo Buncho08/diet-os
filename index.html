@@ -187,6 +187,77 @@
     #history-page .history-stat .metric{font-size:1.45rem}
     .nav-label{font-size:.69rem}
     @media(max-width:390px){.nav-label{font-size:.65rem;min-height:51px}}
+    /* iPhone/Safari: prevent intrinsic date-input and scroll-chip widths from
+       expanding the single-column CSS grid beyond the device viewport. */
+    #history-page{width:100%;max-width:100%;min-width:0;overflow-x:clip}
+    #history-page > .grid{
+      display:grid;
+      grid-template-columns:minmax(0,1fr);
+      width:100%;
+      min-width:0;
+      max-width:100%;
+    }
+    #history-page .hero,
+    #history-page .card,
+    #history-page .history-recent,
+    #history-page .history-toolbar,
+    #history-page .quick-grid,
+    #history-page .history-entry{
+      min-width:0;
+      max-width:100%;
+    }
+    #history-page .history-toolbar{
+      display:grid;
+      grid-template-columns:repeat(2,minmax(0,1fr));
+      gap:8px;
+      align-items:end;
+    }
+    #history-page .history-toolbar .field{
+      grid-column:1 / -1;
+      grid-row:1;
+      display:block;
+      min-width:0;
+      width:100%;
+    }
+    #history-page .history-toolbar input[type="date"]{
+      display:block;
+      box-sizing:border-box;
+      min-width:0;
+      max-width:100%;
+      width:100%;
+      text-align:left;
+    }
+    #history-page #history-previous{grid-column:1;grid-row:2}
+    #history-page #history-next{grid-column:2;grid-row:2}
+    #history-page .history-toolbar .btn{
+      min-width:0;
+      width:100%;
+      white-space:nowrap;
+    }
+    #history-page .history-recent{
+      width:100%;
+      overflow-x:auto;
+      overflow-y:hidden;
+      -webkit-overflow-scrolling:touch;
+      overscroll-behavior-x:contain;
+      padding-bottom:9px;
+    }
+    #history-page .quick-grid{
+      grid-template-columns:repeat(2,minmax(0,1fr));
+      width:100%;
+    }
+    #history-page .quick-stat{min-width:0}
+    #history-page .history-stat .metric{
+      font-size:clamp(1.1rem,5vw,1.45rem);
+      overflow-wrap:anywhere;
+    }
+    #history-page .status{flex-wrap:wrap;min-width:0}
+    #history-page .status > *{min-width:0}
+    #history-page .history-score,
+    #history-page .history-entry,
+    #history-page .history-memo,
+    #history-page .plan-title-main,
+    #history-page .tiny{overflow-wrap:anywhere}
   </style>
 </head>
 <body>
