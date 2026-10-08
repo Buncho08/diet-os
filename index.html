@@ -310,11 +310,12 @@
         <div class="card full subtle-card">
           <h2>今日の記録</h2>
           <div class="quick-grid">
-            <div class="quick-stat"><span>摂取</span><b><span id="home-kcal">0</span> kcal</b></div>
-            <div class="quick-stat"><span>Protein</span><b><span id="home-protein">0</span> g</b></div>
+            <div class="quick-stat"><span>MOVE</span><b><span id="home-move">--</span> kcal</b></div>
             <div class="quick-stat"><span>歩数</span><b id="home-steps">--</b></div>
             <div class="quick-stat"><span>睡眠</span><b><span id="home-sleep">--</span> h</b></div>
+            <div class="quick-stat"><span>摂取</span><b><span id="home-kcal">--</span> kcal</b></div>
           </div>
+          <p class="tiny" id="home-health-updated" style="margin-top:9px">Appleヘルスケア同期データを確認中…</p>
           <div style="display:none">
             <span id="home-weight">--</span><span id="home-weight-date"></span>
             <div id="home-kcal-bar"></div><div id="steps-ring"></div><div id="sleep-ring"></div>
@@ -798,7 +799,23 @@
           sb.from("workout_logs").select("*").eq("user_id",user.id).order("date")
         ]);
         if(p.error)throw p.error;if(f.error)throw f.error;if(w.error)throw w.error;
-        S.set("progressLogs",(p.data||[]).map(x=>({date:x.date,weight:Number(x.weight||0),sleep:Number(x.sleep||0),waist:Number(x.waist||0),thigh:Number(x.thigh||0),calf:Number(x.calf||0),steps:Number(x.steps||0)})));
+        S.set("progressLogs",(p.data||[]).map(x=>({
+          date:x.date,
+          weight:Number(x.weight||0),
+          sleep:Number(x.sleep||0),
+          waist:Number(x.waist||0),
+          thigh:Number(x.thigh||0),
+          calf:Number(x.calf||0),
+          steps:Number(x.steps||0),
+          activeEnergyKcal:Number(x.active_energy_kcal||0),
+          exerciseMinutes:Number(x.exercise_minutes||0),
+          dietaryEnergyKcal:Number(x.dietary_energy_kcal||0),
+          proteinG:Number(x.protein_g||0),
+          carbsG:Number(x.carbs_g||0),
+          fatG:Number(x.fat_g||0),
+          fiberG:Number(x.fiber_g||0),
+          cloudUpdatedAt:x.updated_at||null
+        })));
         S.set("foodLogs",(f.data||[]).map(x=>({id:x.id,date:x.date,meal:x.meal,name:x.name,kcal:Number(x.kcal||0),protein:Number(x.protein||0),memo:x.memo||""})));
         S.set("workoutLogs",(w.data||[]).map(x=>({id:x.id,date:x.date,items:x.items||[]})));
         renderFood();renderProgress();renderHome();loadDailyPlan();
@@ -829,21 +846,56 @@
       });
     }
 
+    function mergeCloudMetrics(metrics){
+      if(!metrics||!metrics.date)return;
+      const logs=S.get("progressLogs",[]);
+      const idx=logs.findIndex(x=>x.date===metrics.date);
+      const prev=idx>=0?logs[idx]:{date:metrics.date};
+      const positive=v=>Number.isFinite(Number(v))&&Number(v)>0?Number(v):0;
+      const merged={...prev,
+        date:metrics.date,
+        sleep:positive(metrics.sleep)||Number(prev.sleep||0),
+        steps:positive(metrics.steps)||Number(prev.steps||0),
+        activeEnergyKcal:positive(metrics.active_energy_kcal)||Number(prev.activeEnergyKcal||0),
+        exerciseMinutes:Number.isFinite(Number(metrics.exercise_minutes))?Number(metrics.exercise_minutes):Number(prev.exerciseMinutes||0),
+        dietaryEnergyKcal:positive(metrics.dietary_energy_kcal)||Number(prev.dietaryEnergyKcal||0),
+        proteinG:positive(metrics.protein_g)||Number(prev.proteinG||0),
+        carbsG:positive(metrics.carbs_g)||Number(prev.carbsG||0),
+        fatG:positive(metrics.fat_g)||Number(prev.fatG||0),
+        fiberG:positive(metrics.fiber_g)||Number(prev.fiberG||0),
+        cloudUpdatedAt:metrics.updated_at||prev.cloudUpdatedAt||null
+      };
+      if(positive(metrics.weight))merged.weight=Number(metrics.weight);
+      if(idx>=0)logs[idx]=merged;else logs.push(merged);
+      logs.sort((a,b)=>a.date.localeCompare(b.date));
+      S.set("progressLogs",logs);
+    }
+
     function renderHome(){
       const n=nutrition();
-      $("home-kcal").textContent=Math.round(n.kcal);
-      $("home-protein").textContent=Math.round(n.protein);
-      $("home-kcal-bar").style.width=clamp(n.kcal/target.kcal*100,0,100)+"%";
-      const p=latest(S.get("progressLogs",[]));
+      const logs=S.get("progressLogs",[]);
+      const p=logs.find(x=>x.date===S.date())||latest(logs);
+      const syncedIntake=Number(p?.dietaryEnergyKcal||0);
+      const intake=syncedIntake>0?syncedIntake:n.kcal;
+      $("home-kcal").textContent=intake>0?Math.round(intake):"--";
+      $("home-kcal-bar").style.width=clamp((intake||0)/target.kcal*100,0,100)+"%";
+      $("home-move").textContent=Number(p?.activeEnergyKcal||0)>0?Math.round(Number(p.activeEnergyKcal)):"--";
       if(p){
-        $("home-weight").textContent=p.weight;
+        $("home-weight").textContent=Number(p.weight||0)>0?p.weight:"--";
         $("home-weight-date").textContent=p.date;
-        $("home-steps").textContent=p.steps?Number(p.steps).toLocaleString("ja-JP"):"--";
-        $("home-sleep").textContent=p.sleep||"--";
+        $("home-steps").textContent=Number(p.steps||0)>0?Number(p.steps).toLocaleString("ja-JP"):"--";
+        $("home-sleep").textContent=Number(p.sleep||0)>0?Number(p.sleep).toFixed(1).replace(/\.0$/,""):"--";
         $("steps-ring").style.setProperty("--v",clamp(Number(p.steps||0)/target.steps*100,0,100));
         $("sleep-ring").style.setProperty("--v",clamp(Number(p.sleep||0)/target.sleep*100,0,100));
+        if($("home-health-updated")){
+          const updated=p.cloudUpdatedAt?formatPlanTime(p.cloudUpdatedAt):"";
+          $("home-health-updated").textContent=(Number(p.activeEnergyKcal||0)>0||Number(p.steps||0)>0||Number(p.sleep||0)>0)
+            ?"Appleヘルスケア同期"+(updated?" ・ "+updated+"更新":"")
+            :"Appleヘルスケアの当日データはまだありません。";
+        }
+      }else if($("home-health-updated")){
+        $("home-health-updated").textContent="Appleヘルスケアの当日データはまだありません。";
       }
-
     }
 
     const categoryLabel={
@@ -976,6 +1028,10 @@
         const body=await res.json().catch(()=>({}));
         if(!res.ok)throw new Error(body.error||"今日のプランを取得できませんでした");
         currentPlanReadOnly=body.read_only===true;
+        if(body.metrics){
+          mergeCloudMetrics(body.metrics);
+          renderProgress();
+        }
         if(body.preferences){
           const prefs=normalizeTrainingPreferences(body.preferences);
           S.set("trainingPreferences",prefs);
