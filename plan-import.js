@@ -48,6 +48,14 @@
     const warning = document.createElement("p");
     warning.className = "desc";
     warning.textContent = "登録すると、この日付の既存プランとチェック状態は置き換わり、全項目が未実施になります。";
+    const preview = document.createElement("div");
+    preview.className = "desc";
+    preview.style.cssText = "max-height:180px;overflow-y:auto;padding:10px;border:1px solid #34414b;border-radius:10px;margin:10px 0";
+    preview.textContent = plan.items.map((x,i) => (i+1) + ". " + x.title + " — " + x.detail).join("\n");
+    preview.style.whiteSpace = "pre-wrap";
+    const localDate = new Date();
+    const today = [localDate.getFullYear(),String(localDate.getMonth()+1).padStart(2,"0"),String(localDate.getDate()).padStart(2,"0")].join("-");
+    if (plan.date !== today) warning.textContent = "注意：これは今日以外のプランです。登録すると過去または未来の既存項目が置き換わります。";
     const status = document.createElement("p");
     status.className = "desc";
     status.setAttribute("role", "status");
@@ -127,7 +135,7 @@
         confirm.disabled = false;
       }
     });
-    panel.append(title, detail, warning, status, confirm, cancel);
+    panel.append(title, detail, warning, preview, status, confirm, cancel);
     cover.append(panel);
     document.body.appendChild(cover);
     confirm.focus();
