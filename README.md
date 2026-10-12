@@ -1,1 +1,77 @@
 # diet-os
+
+## ChatGPTからの毎朝のプラン登録（POST）
+
+Supabase Edge Function `daily-plan-publish` に、ChatGPTが決定したプランを投稿できます。
+アプリ側はプラン表示と「やった / やっていない」等の実績記録を担当します。
+
+### 初期設定（ユーザー本人）
+
+1. GitHub Pages 上の Diet OS にログインします。
+2. 「ChatGPT API」タブの「ChatGPT プラン自動登録（POST）」から「投稿用トークンを発行」を押します。
+3. 「接続情報をコピー」を押し、その内容をChatGPTのチャットへ送信して定期実行に設定します。
+4. このトークンは再表示されません。紛失時は再発行します。再発行・無効化は読み取り用APIを変更しません。
+
+### エンドポイント
+
+`POST https://dygzsficwncawfkyuvoy.supabase.co/functions/v1/daily-plan-publish`
+
+ヘッダー（実際のトークンをコードやGitHubにコミットしないこと）:
+
+```
+Content-Type: application/json
+X-Plan-Token: <投稿用トークン>
+```
+
+JSON例:
+
+```json
+{
+  "date": "2026-10-13",
+  "title": "今日のプラン",
+  "summary": "日々の実績・ユーザー設定を踏まえた方針",
+  "items": [
+    { "category": "food", "title": "朝食", "detail": "たんぱく質のある朝食をとる" },
+    { "category": "cardio", "title": "ウォーキング", "detail": "20分間、会話できる強度で歩く" }
+  ]
+}
+```
+
+category は `food / strength / cardio / steps / sleep / recovery / other` のいずれか。
+プランは当日の `daily_plans` にupsertされ、`daily_plan_items` に未完了（pending）として登録されます。
+既存プランの項目に完了・スキップがある場合は、実績を消さないためHTTP 409で投稿を拒否します。
+
+### ChatGPT定期実行からのHTTP POST
+
+ChatGPTのSupabase接続を利用し、Supabaseの `pg_net` 拡張の `net.http_post` を呼び出します。
+送信する際のSQL例（認証情報を公開しないこと）:
+
+```sql
+select net.http_post(
+  url := 'https://dygzsficwncawfkyuvoy.supabase.co/functions/v1/daily-plan-publish',
+  body := '{"date":"2026-10-13","title":"今日のプラン","summary":"例","items":[{"category":"steps","title":"散歩","detail":"30分歩く"}]}'::jsonb,
+  headers := jsonb_build_object(
+    'Content-Type','application/json',
+    'X-Plan-Token','<投稿用トークン>'
+  ),
+  timeout_milliseconds := 15000
+) as request_id;
+```
+
+上記は非同期送信です。返却された `request_id` について、次のSQLで成功（HTTP 201）を必ず検証します。
+
+```sql
+select id, status_code, content, error_msg
+from net._http_response
+where id = <request_id>;
+```
+
+レスポンスが未到着の場合は少し後に再確認します。成功の確認なしに登録済みとは通知しません。
+
+### セキュリティ
+
+- 読み取り専用トークンはPOSTでは使えません。 `api_tokens.scopes.plan_write = true` の専用トークンのみ許可します。
+- ユーザー自身がログインした画面でSHA-256ハッシュを発行・保存し、サーバーにはトークン原文を保存しません。
+- トークンで指定できる対象ユーザーは本人のみです。
+- 「投稿権限を無効化」でトークンを失効できます。
+- アプリのフロントエンド・GitHubには投稿用トークンを埋め込まないでください。
