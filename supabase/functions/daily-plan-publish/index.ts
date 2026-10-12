@@ -26,17 +26,22 @@ Deno.serve(async(req:Request)=>{
     typeof x.title==="string"&&x.title.length>0&&x.title.length<=150&&
     (x.detail===undefined||(typeof x.detail==="string"&&x.detail.length<=1500))))
     return reply({error:"invalid items"},400);
+  const {data:currentPlan,error:lookupError}=await service.from("daily_plans").select("id")
+    .eq("user_id",access.user_id).eq("plan_date",input.date).maybeSingle();
+  if(lookupError)return reply({error:lookupError.message},400);
+  if(currentPlan){
+    const {data:existing,error:existingError}=await service.from("daily_plan_items").select("status")
+      .eq("user_id",access.user_id).eq("plan_id",currentPlan.id);
+    if(existingError)return reply({error:existingError.message},400);
+    if(existing?.some((x:any)=>x.status!=="pending"))
+      return reply({error:"plan has progress; refusing to reset status"},409);
+  }
   const {data:plan,error:planError}=await service.from("daily_plans").upsert({
     user_id:access.user_id,plan_date:input.date,title:String(input.title??"今日のプラン").slice(0,150),
     summary:String(input.summary??"").slice(0,1500),generated_by:"chatgpt",
     updated_at:new Date().toISOString()
   },{onConflict:"user_id,plan_date"}).select("id").single();
   if(planError)return reply({error:planError.message},400);
-  const {data:existing,error:existingError}=await service.from("daily_plan_items").select("status")
-    .eq("user_id",access.user_id).eq("plan_id",plan.id);
-  if(existingError)return reply({error:existingError.message},400);
-  if(existing?.some((x:any)=>x.status!=="pending"))
-    return reply({error:"plan has progress; refusing to reset status"},409);
   const {error:deleteError}=await service.from("daily_plan_items").delete()
     .eq("user_id",access.user_id).eq("plan_id",plan.id);
   if(deleteError)return reply({error:deleteError.message},400);
