@@ -494,6 +494,21 @@
         </div>
 
         <div class="card full">
+          <h2>ChatGPT プラン自動登録（POST）</h2>
+          <p class="tiny">毎朝のChatGPT定期実行から今日のプランを書き込むための、投稿専用トークンを発行します。読み取り用URLとは別の権限です。</p>
+          <div class="cloud-row">
+            <button class="btn" type="button" id="create-plan-write-token">投稿用トークンを発行</button>
+            <button class="btn secondary" type="button" id="copy-plan-write-token">接続情報をコピー</button>
+            <button class="btn danger" type="button" id="revoke-plan-write-token">投稿権限を無効化</button>
+          </div>
+          <div id="plan-write-token-wrap" style="display:none;margin-top:10px">
+            <div class="tiny">今回発行した投稿用トークン（再表示できません）</div>
+            <div class="share-url" id="plan-write-token"></div>
+          </div>
+          <div class="privacy-note" style="margin-top:10px">発行後「接続情報をコピー」からこのChatGPTチャットに送ってください。発行し直すと古い投稿トークンは無効になります。パスワード同様、公開リポジトリ等には掲載しないでください。</div>
+        </div>
+
+        <div class="card full">
           <h2>レポート設定</h2>
           <div class="form">
             <label class="field">
@@ -1287,6 +1302,56 @@
         localStorage.removeItem("dietOsApiUrl");
         renderApiUrl();
         alert("APIを無効化しました。");
+      }catch(e){alert("無効化に失敗しました。\n\n"+(e.message||e));}
+    });
+
+    // This credential is kept in memory only, not in localStorage.
+    let planWriteToken="";
+    const planPublishEndpoint=SUPABASE_URL+"/functions/v1/daily-plan-publish";
+    $("create-plan-write-token").addEventListener("click",async()=>{
+      const accessToken=await currentAccessToken();if(!accessToken)return;
+      const user=await connectCloud();if(!user)return;
+      try{
+        const bytes=crypto.getRandomValues(new Uint8Array(32));
+        const value=Array.from(bytes,x=>x.toString(16).padStart(2,"0")).join("");
+        const digest=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(value));
+        const tokenHash=Array.from(new Uint8Array(digest),x=>x.toString(16).padStart(2,"0")).join("");
+        const {error:revokeError}=await sb.from("api_tokens").update({active:false})
+          .eq("user_id",user.id).eq("active",true).contains("scopes",{plan_write:true});
+        if(revokeError)throw revokeError;
+        const {error}=await sb.from("api_tokens").insert({
+          user_id:user.id,token_hash:tokenHash,scopes:{plan_write:true},active:true
+        });
+        if(error)throw error;
+        planWriteToken=value;
+        $("plan-write-token").textContent=value;
+        $("plan-write-token-wrap").style.display="block";
+        alert("投稿用トークンを発行しました。接続情報をコピーして、このChatGPTチャットへ送信してください。");
+      }catch(e){alert("投稿用トークンの発行に失敗しました。\n\n"+(e.message||e));}
+    });
+    $("copy-plan-write-token").addEventListener("click",async()=>{
+      if(!planWriteToken){alert("先に投稿用トークンを発行してください。");return;}
+      const info="Diet OSの毎朝のプラン登録に、このPOST APIを使用してください。\n"
+        +"POST: "+planPublishEndpoint+"\n"
+        +"認証ヘッダー X-Plan-Token: "+planWriteToken+"\n"
+        +"毎朝8時（日本時間）の定期実行でChatGPTが作成したJSONプランを登録してください。";
+      try{
+        await navigator.clipboard.writeText(info);
+        alert("接続情報をコピーしました。このChatGPTチャットへ送信してください。");
+      }catch{alert("コピーできませんでした。表示されたトークンを長押ししてコピーしてください。");}
+    });
+    $("revoke-plan-write-token").addEventListener("click",async()=>{
+      if(!confirm("ChatGPTからのプラン自動投稿を無効化しますか？"))return;
+      const accessToken=await currentAccessToken();if(!accessToken)return;
+      const user=await connectCloud();if(!user)return;
+      try{
+        const {error}=await sb.from("api_tokens").update({active:false})
+          .eq("user_id",user.id).eq("active",true).contains("scopes",{plan_write:true});
+        if(error)throw error;
+        planWriteToken="";
+        $("plan-write-token").textContent="";
+        $("plan-write-token-wrap").style.display="none";
+        alert("投稿用トークンを無効化しました。");
       }catch(e){alert("無効化に失敗しました。\n\n"+(e.message||e));}
     });
 
