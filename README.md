@@ -75,3 +75,38 @@ where id = <request_id>;
 - トークンで指定できる対象ユーザーは本人のみです。
 - 「投稿権限を無効化」でトークンを失効できます。
 - アプリのフロントエンド・GitHubには投稿用トークンを埋め込まないでください。
+
+
+## メール・パスワードで毎回ログインして投稿する方式（オプション）
+
+既存の `daily-plan` Edge Function は、Supabase Authで取得したJWTのBearer認証に対応しています。
+専用投稿トークンを使わない場合は `scripts/publish-daily-plan.mjs` を利用できます。
+
+**重要:** 元のDiet OSは `signInAnonymously()` を採用していました。匿名ユーザーのままではメール・パスワードで再ログインできません。
+アプリの「自動投稿用のログイン設定」で、**現在の匿名アカウント**にメールを連携 → 確認メールを承認 → パスワードを設定してください。
+メール連携にはSupabase DashboardのAuth設定でManual Identity Linkingの有効化が必要な場合があります。別ユーザーを新規作成すると現在の記録が別のユーザーIDになり、元のデータにアクセスできなくなります。
+
+### 認証APIの処理
+
+1. `POST /auth/v1/token?grant_type=password` へメール・パスワードを送信し、`access_token` を得ます。
+2. `POST /functions/v1/daily-plan` に `Authorization: Bearer <access_token>` を添えて当日のプランJSONを送ります。
+3. HTTP 201と `ok: true` / `plan_id` を検証します。失敗したら登録完了扱いにしません。
+
+アプリにはアクセストークンの固定値を埋め込みません。Supabase Authが発行する短期トークンを送信の都度取得します。
+
+### スクリプト実行
+
+```sh
+# すべての環境変数は安全なsecret storeから注入します。
+# DIET_OS_EMAIL          ログインメールアドレス
+# DIET_OS_PASSWORD       ログインパスワード
+# SUPABASE_PUBLISHABLE_KEY プロジェクトのpublishable key（公開可能）
+# DIET_OS_USER_ID        任意。誤ったアカウントへの投稿を防止するためのユーザーID
+
+node scripts/publish-daily-plan.mjs ./daily-plan.json
+```
+
+`daily-plan.json` はChatGPTがその日のログやユーザー設定を参考に作成したプランJSONです。生成済みJSONを標準入力で渡すこともできます。
+**スクリプトはChatGPTのプラン作成を代行しません**。自動で動作させるには、秘密情報ストアを利用できるスケジューラー/実行環境に組み込む必要があります。
+
+ChatGPTの定期実行で使用する場合も、ログイン情報を自動タスクのプロンプトに平文で書き込まないでください。継続的なSupabaseへの接続権限と、安全な認証情報の取得手段が必要です。
