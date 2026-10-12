@@ -494,6 +494,26 @@
         </div>
 
         <div class="card full">
+          <h2>自動投稿用のログイン設定</h2>
+          <p class="tiny">現在の匿名ユーザーを、メール・パスワードで再ログイン可能なアカウントに変更できます。既存の記録を維持するため、先にメール連携を行ってください。メール認証完了後にパスワードを登録します。</p>
+          <div class="form" style="margin-top:10px">
+            <label class="field wide"><span>メールアドレス</span>
+              <input id="diet-auth-email" type="email" autocomplete="email" placeholder="you@example.com" />
+            </label>
+            <label class="field wide"><span>パスワード（12文字以上）</span>
+              <input id="diet-auth-password" type="password" autocomplete="new-password" placeholder="12文字以上のパスワード" />
+            </label>
+          </div>
+          <div class="cloud-row">
+            <button class="btn" type="button" id="link-diet-auth-email">匿名アカウントにメールを登録</button>
+            <button class="btn secondary" type="button" id="set-diet-auth-password">メール確認後、パスワードを設定</button>
+            <button class="btn secondary" type="button" id="signin-diet-auth-password">既存アカウントにログイン</button>
+          </div>
+          <p class="tiny" id="diet-auth-state" style="margin-top:10px">アカウント状態を確認中…</p>
+          <div class="privacy-note" style="margin-top:10px">ログイン情報をGitHubやChatGPTの定期実行文面に平文で記載しないでください。自動投稿を別プロセスから行う場合は秘密情報ストアを使用してください。</div>
+        </div>
+
+        <div class="card full">
           <h2>ChatGPT プラン自動登録（POST）</h2>
           <p class="tiny">毎朝のChatGPT定期実行から今日のプランを書き込むための、投稿専用トークンを発行します。読み取り用URLとは別の権限です。</p>
           <div class="cloud-row">
@@ -1304,6 +1324,67 @@
         alert("APIを無効化しました。");
       }catch(e){alert("無効化に失敗しました。\n\n"+(e.message||e));}
     });
+
+    async function renderDietAuthState(){
+      const user=await getCloudSession();
+      const el=$("diet-auth-state");
+      if(!user){el.textContent="ログイン状態: 未接続";return;}
+      if(user.is_anonymous){
+        el.textContent="現在は匿名ユーザーです。メール連携すると同じデータを保持できます。";
+      }else{
+        el.textContent="メール認証: "+(user.email_confirmed_at?"確認済み":"未確認")+
+          " / アカウント: "+(user.email||"メール未設定");
+      }
+    }
+    $("link-diet-auth-email").addEventListener("click",async()=>{
+      const user=await connectCloud();if(!user)return;
+      if(!user.is_anonymous){alert("このアカウントは既に匿名ユーザーではありません。");return;}
+      const email=$("diet-auth-email").value.trim();
+      if(!email||!$("diet-auth-email").checkValidity()){
+        alert("有効なメールアドレスを入力してください。");return;
+      }
+      try{
+        const redirectTo=location.origin+location.pathname;
+        const {error}=await sb.auth.updateUser({email},{emailRedirectTo:redirectTo});
+        if(error)throw error;
+        alert("確認メールを送信しました。メール内のリンクで確認を完了させ、アプリに戻ってからパスワードを設定してください。");
+        await renderDietAuthState();
+      }catch(e){alert("メール連携に失敗しました。Supabaseで匿名ユーザーのIdentity Linkingが有効か確認してください。\n\n"+(e.message||e));}
+    });
+    $("set-diet-auth-password").addEventListener("click",async()=>{
+      const user=await connectCloud();if(!user)return;
+      if(user.is_anonymous||!user.email_confirmed_at){
+        alert("先にメールアドレスを登録し、確認メールで認証してください。");return;
+      }
+      const password=$("diet-auth-password").value;
+      if(password.length<12){alert("パスワードは12文字以上にしてください。");return;}
+      try{
+        const {error}=await sb.auth.updateUser({password});
+        if(error)throw error;
+        $("diet-auth-password").value="";
+        alert("パスワードを設定しました。定期実行で使う認証APIに対応しています。");
+        await renderDietAuthState();
+      }catch(e){alert("パスワード設定に失敗しました。\n\n"+(e.message||e));}
+    });
+    $("signin-diet-auth-password").addEventListener("click",async()=>{
+      const email=$("diet-auth-email").value.trim();
+      const password=$("diet-auth-password").value;
+      if(!email||!password){alert("メールアドレスとパスワードを入力してください。");return;}
+      const current=await getCloudSession();
+      if(current?.is_anonymous&&!confirm("別アカウントへのログインでは、現在の匿名アカウントの記録を表示できなくなる可能性があります。先にメール連携を完了しましたか？"))return;
+      try{
+        const {data,error}=await sb.auth.signInWithPassword({email,password});
+        if(error)throw error;
+        $("diet-auth-password").value="";
+        cloudUser=data.user;
+        setCloudStatus("接続済み",true);
+        await renderDietAuthState();
+        await loadTrainingPreferences();
+        await loadDailyPlan();
+        alert("ログインしました。");
+      }catch(e){alert("ログインに失敗しました。\n\n"+(e.message||e));}
+    });
+    renderDietAuthState();
 
     // This credential is kept in memory only, not in localStorage.
     let planWriteToken="";
