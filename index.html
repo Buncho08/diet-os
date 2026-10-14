@@ -1326,9 +1326,14 @@
     });
 
     async function renderDietAuthState(){
-      const user=await getCloudSession();
       const el=$("diet-auth-state");
+      if(!sb){el.textContent="Supabase SDKを読み込めませんでした";return;}
+      // getSession() may retain a stale user object after email confirmation.
+      // Query Auth server so confirmation state is always current.
+      const {data,error}=await sb.auth.getUser();
+      const user=!error?data?.user:null;
       if(!user){el.textContent="ログイン状態: 未接続";return;}
+      cloudUser=user;
       if(user.is_anonymous){
         el.textContent="現在は匿名ユーザーです。メール連携すると同じデータを保持できます。";
       }else{
